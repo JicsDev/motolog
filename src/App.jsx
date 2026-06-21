@@ -31,12 +31,61 @@ export default function App() {
   const [activeModal, setActiveModal] = useState(null);
   const [selectedEntry, setSelectedEntry] = useState(null); // NOVO: Controla qual registro está aberto no LOG
 
-  // --- Estado de Dados ---
-  const [config, setConfig] = useState({
-    tanqueTotal: 15,
-    kmL: 25,
-    odometro: 12532
+  // --- Estado de Dados (Agora com salvamento automático) ---
+  const [config, setConfig] = useState(() => {
+    const savedConfig = localStorage.getItem('motolog_config');
+    return savedConfig ? JSON.parse(savedConfig) : {
+      tanqueTotal: 15,
+      kmL: 25,
+      odometro: 12532
+    };
   });
+
+  const [currentFuel, setCurrentFuel] = useState(() => {
+    const savedFuel = localStorage.getItem('motolog_fuel');
+    return savedFuel ? JSON.parse(savedFuel) : 11.1;
+  }); 
+
+  const [entries, setEntries] = useState(() => {
+    const savedEntries = localStorage.getItem('motolog_entries');
+    if (savedEntries) return JSON.parse(savedEntries);
+    // Se for a primeira vez abrindo o app, mostra os exemplos
+    return [
+      {
+        id: 1,
+        type: 'abastecimento',
+        date: new Date(Date.now() - 86400000 * 2).toISOString(),
+        odometro: 12400,
+        litros: 10,
+        valorTotal: 58.90,
+        precoLitro: 5.89,
+        isFullTank: false,
+        descricao: 'Posto Ipiranga perto de casa.'
+      },
+      {
+        id: 2,
+        type: 'despesa',
+        date: new Date(Date.now() - 86400000 * 5).toISOString(),
+        titulo: 'Troca de Óleo',
+        valor: 85.00,
+        descricao: 'Óleo Motul 5000 10W40. Próxima troca em 15.000km.'
+      }
+    ];
+  });
+
+  // Salva os dados no navegador sempre que algo mudar
+  useEffect(() => {
+    localStorage.setItem('motolog_config', JSON.stringify(config));
+  }, [config]);
+
+  useEffect(() => {
+    localStorage.setItem('motolog_fuel', JSON.stringify(currentFuel));
+  }, [currentFuel]);
+
+  useEffect(() => {
+    localStorage.setItem('motolog_entries', JSON.stringify(entries));
+  }, [entries]);
+
 
   const [currentFuel, setCurrentFuel] = useState(11.1); 
 
