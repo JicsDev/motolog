@@ -1,27 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
-  LayoutDashboard, 
-  List, 
-  BarChart2, 
-  Settings, 
-  Plus, 
-  X, 
-  Fuel, 
-  Wrench, 
-  Gauge, 
-  Droplets,
-  Calendar,
-  Banknote,
-  MapPin,
-  CheckCircle2,
-  Download,
-  Upload,
-  Database,
-  AlertCircle,
-  Trash2,
-  Wallet,
-  Edit2,
-  Info
+  LayoutDashboard, List, BarChart2, Settings, Plus, X, Fuel, Wrench, 
+  Gauge, Droplets, Calendar, Banknote, MapPin, CheckCircle2, Download, 
+  Upload, Database, AlertCircle, Trash2, Wallet, Edit2, Info
 } from 'lucide-react';
 
 export default function App() {
@@ -29,51 +10,48 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('PAINEL');
   const [fabMenuOpen, setFabMenuOpen] = useState(false);
   const [activeModal, setActiveModal] = useState(null);
-  const [selectedEntry, setSelectedEntry] = useState(null); // NOVO: Controla qual registro está aberto no LOG
+  const [selectedEntry, setSelectedEntry] = useState(null);
 
-  // --- Estado de Dados (Agora com salvamento automático) ---
+  // --- Estado de Dados (Com salvamento no LocalStorage Forçado) ---
   const [config, setConfig] = useState(() => {
-    const savedConfig = localStorage.getItem('motolog_config');
-    return savedConfig ? JSON.parse(savedConfig) : {
-      tanqueTotal: 15,
-      kmL: 25,
-      odometro: 12532
-    };
+    try {
+      const savedConfig = localStorage.getItem('motolog_config');
+      return savedConfig ? JSON.parse(savedConfig) : { tanqueTotal: 15, kmL: 25, odometro: 12532 };
+    } catch (e) {
+      return { tanqueTotal: 15, kmL: 25, odometro: 12532 };
+    }
   });
 
   const [currentFuel, setCurrentFuel] = useState(() => {
-    const savedFuel = localStorage.getItem('motolog_fuel');
-    return savedFuel ? JSON.parse(savedFuel) : 11.1;
+    try {
+      const savedFuel = localStorage.getItem('motolog_fuel');
+      return savedFuel ? JSON.parse(savedFuel) : 11.1;
+    } catch (e) {
+      return 11.1;
+    }
   }); 
 
   const [entries, setEntries] = useState(() => {
-    const savedEntries = localStorage.getItem('motolog_entries');
-    if (savedEntries) return JSON.parse(savedEntries);
-    // Se for a primeira vez abrindo o app, mostra os exemplos
+    try {
+      const savedEntries = localStorage.getItem('motolog_entries');
+      if (savedEntries) return JSON.parse(savedEntries);
+    } catch (e) { console.error("Erro ao ler dados:", e); }
+    
+    // Fallback padrão se for o primeiro acesso
     return [
       {
-        id: 1,
-        type: 'abastecimento',
-        date: new Date(Date.now() - 86400000 * 2).toISOString(),
-        odometro: 12400,
-        litros: 10,
-        valorTotal: 58.90,
-        precoLitro: 5.89,
-        isFullTank: false,
+        id: 1, type: 'abastecimento', date: new Date(Date.now() - 86400000 * 2).toISOString(),
+        odometro: 12400, litros: 10, valorTotal: 58.90, precoLitro: 5.89, isFullTank: false,
         descricao: 'Posto Ipiranga perto de casa.'
       },
       {
-        id: 2,
-        type: 'despesa',
-        date: new Date(Date.now() - 86400000 * 5).toISOString(),
-        titulo: 'Troca de Óleo',
-        valor: 85.00,
-        descricao: 'Óleo Motul 5000 10W40. Próxima troca em 15.000km.'
+        id: 2, type: 'despesa', date: new Date(Date.now() - 86400000 * 5).toISOString(),
+        titulo: 'Troca de Óleo', valor: 85.00, descricao: 'Óleo Motul 5000 10W40. Próxima troca em 15.000km.'
       }
     ];
   });
 
-  // Salva os dados no navegador sempre que algo mudar
+  // Efeitos que gravam no celular/navegador em tempo real
   useEffect(() => {
     localStorage.setItem('motolog_config', JSON.stringify(config));
   }, [config]);
@@ -85,31 +63,6 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('motolog_entries', JSON.stringify(entries));
   }, [entries]);
-
-
-  const [currentFuel, setCurrentFuel] = useState(11.1); 
-
-  const [entries, setEntries] = useState([
-    {
-      id: 1,
-      type: 'abastecimento',
-      date: new Date(Date.now() - 86400000 * 2).toISOString(),
-      odometro: 12400,
-      litros: 10,
-      valorTotal: 58.90,
-      precoLitro: 5.89,
-      isFullTank: false,
-      descricao: 'Posto Ipiranga perto de casa.'
-    },
-    {
-      id: 2,
-      type: 'despesa',
-      date: new Date(Date.now() - 86400000 * 5).toISOString(),
-      titulo: 'Troca de Óleo',
-      valor: 85.00,
-      descricao: 'Óleo Motul 5000 10W40. Próxima troca em 15.000km.'
-    }
-  ]);
 
   useEffect(() => {
     setFabMenuOpen(false);
@@ -136,6 +89,7 @@ export default function App() {
   };
 
   return (
+
     <div className="h-[100dvh] w-full bg-[#060b14] flex justify-center font-sans text-slate-200 overflow-hidden">
       
       {/* Container Mobile */}
