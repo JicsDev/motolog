@@ -1,27 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
-  LayoutDashboard, 
-  List, 
-  BarChart2, 
-  Settings, 
-  Plus, 
-  X, 
-  Fuel, 
-  Wrench, 
-  Gauge, 
-  Droplets,
-  Calendar,
-  Banknote,
-  MapPin,
-  CheckCircle2,
-  Download,
-  Upload,
-  Database,
-  AlertCircle,
-  Trash2,
-  Wallet,
-  Edit2,
-  Info
+  LayoutDashboard, List, BarChart2, Settings, Plus, X, Fuel, Wrench, 
+  Gauge, Droplets, Calendar, Banknote, MapPin, CheckCircle2, Download, 
+  Upload, Database, AlertCircle, Trash2, Wallet, Edit2, Info
 } from 'lucide-react';
 
 export default function App() {
@@ -29,9 +10,9 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('PAINEL');
   const [fabMenuOpen, setFabMenuOpen] = useState(false);
   const [activeModal, setActiveModal] = useState(null);
-  const [selectedEntry, setSelectedEntry] = useState(null); 
+  const [selectedEntry, setSelectedEntry] = useState(null);
 
-  // --- Estado de Dados (Com salvamento no LocalStorage) ---
+  // --- Estado de Dados (Com salvamento no LocalStorage Forçado) ---
   const [config, setConfig] = useState(() => {
     try {
       const savedConfig = localStorage.getItem('motolog_config');
@@ -54,45 +35,23 @@ export default function App() {
     try {
       const savedEntries = localStorage.getItem('motolog_entries');
       if (savedEntries) return JSON.parse(savedEntries);
-    } catch (e) { 
-      console.error("Erro ao ler dados:", e); 
-    }
+    } catch (e) { console.error("Erro ao ler dados:", e); }
     
-    // Fallback padrão com exemplos já contendo Odômetro para os alertas funcionarem de início
+    // Fallback padrão se for o primeiro acesso
     return [
       {
-        id: 1,
-        type: 'abastecimento',
-        date: new Date(Date.now() - 86400000 * 2).toISOString(),
-        odometro: 12400,
-        litros: 10,
-        valorTotal: 58.90,
-        precoLitro: 5.89,
-        isFullTank: false,
+        id: 1, type: 'abastecimento', date: new Date(Date.now() - 86400000 * 2).toISOString(),
+        odometro: 12400, litros: 10, valorTotal: 58.90, precoLitro: 5.89, isFullTank: false,
         descricao: 'Posto Ipiranga perto de casa.'
       },
       {
-        id: 2,
-        type: 'despesa',
-        date: new Date(Date.now() - 86400000 * 5).toISOString(),
-        titulo: 'Troca de Óleo',
-        valor: 85.00,
-        odometro: 12100, // Registrado a 432km atrás (considerando o odo padrão 12532)
-        descricao: 'Óleo Motul 5000 10W40.'
-      },
-      {
-        id: 3,
-        type: 'despesa',
-        date: new Date(Date.now() - 86400000 * 8).toISOString(),
-        titulo: 'Lubrificação da Corrente',
-        valor: 0.00,
-        odometro: 12450, // Registrado a 82km atrás
-        descricao: 'Uso de spray lubrificante C4.'
+        id: 2, type: 'despesa', date: new Date(Date.now() - 86400000 * 5).toISOString(),
+        titulo: 'Troca de Óleo', valor: 85.00, descricao: 'Óleo Motul 5000 10W40. Próxima troca em 15.000km.'
       }
     ];
   });
 
-  // Gravação automática no LocalStorage
+  // Efeitos que gravam no celular/navegador em tempo real
   useEffect(() => {
     localStorage.setItem('motolog_config', JSON.stringify(config));
   }, [config]);
@@ -130,6 +89,7 @@ export default function App() {
   };
 
   return (
+
     <div className="h-[100dvh] w-full bg-[#060b14] flex justify-center font-sans text-slate-200 overflow-hidden">
       
       {/* Container Mobile */}
@@ -149,7 +109,7 @@ export default function App() {
 
         {/* Área Central que Rola */}
         <main className="flex-1 overflow-y-auto pb-28 px-4 custom-scrollbar z-10 relative">
-          {activeTab === 'PAINEL' && <TabPainel currentFuel={currentFuel} tanqueTotal={config.tanqueTotal} config={config} entries={entries} />}
+          {activeTab === 'PAINEL' && <TabPainel currentFuel={currentFuel} tanqueTotal={config.tanqueTotal} config={config} />}
           {activeTab === 'LOG' && <TabLog entries={entries} onSelectEntry={setSelectedEntry} />}
           {activeTab === 'RELATÓRIOS' && <TabRelatorios entries={entries} config={config} />}
           {activeTab === 'CONFIGURAÇÕES' && <TabConfiguracoes config={config} currentFuel={currentFuel} entries={entries} onCalculate={handleCalculateConfig} onImportData={handleImportData} onResetData={handleResetData} />}
@@ -191,10 +151,10 @@ export default function App() {
 
         {/* Modais Principais */}
         {activeModal === 'abastecimento' && <ModalAbastecimento onClose={() => setActiveModal(null)} config={config} setConfig={setConfig} currentFuel={currentFuel} setCurrentFuel={setCurrentFuel} setEntries={setEntries} />}
-        {activeModal === 'despesa' && <ModalDespesa onClose={() => setActiveModal(null)} config={config} setEntries={setEntries} />}
+        {activeModal === 'despesa' && <ModalDespesa onClose={() => setActiveModal(null)} setEntries={setEntries} />}
         {activeModal === 'odometro' && <ModalOdometro onClose={() => setActiveModal(null)} config={config} setConfig={setConfig} currentFuel={currentFuel} setCurrentFuel={setCurrentFuel} setEntries={setEntries} />}
 
-        {/* Modal de Detalhes do Registro (Log) */}
+        {/* NOVO: Modal de Detalhes do Registro (Log) */}
         {selectedEntry && (
           <ModalDetalhes 
             entry={selectedEntry} 
@@ -221,28 +181,13 @@ export default function App() {
   );
 }
 
-function TabPainel({ currentFuel, tanqueTotal, config, entries }) {
+function TabPainel({ currentFuel, tanqueTotal, config }) {
   const percent = Math.max(0, Math.min(100, (currentFuel / tanqueTotal) * 100));
   const rotation = -90 + (percent * 1.8);
 
-  // --- LÓGICA DE ALERTAS INTELIGENTES ---
-  // 1. Alerta do Óleo (Limite: 1500km)
-  const ultimaTrocaOleo = entries.find(e => e.type === 'despesa' && (e.titulo?.toLowerCase().includes('óleo') || e.titulo?.toLowerCase().includes('oleo')));
-  const kmDesdeOleo = ultimaTrocaOleo && ultimaTrocaOleo.odometro ? config.odometro - ultimaTrocaOleo.odometro : 0;
-  const limiteOleo = 1500;
-  const restanteOleo = Math.max(0, limiteOleo - kmDesdeOleo);
-  const pctOleo = ultimaTrocaOleo ? Math.max(0, Math.min(100, (restanteOleo / limiteOleo) * 100)) : 0;
-
-  // 2. Alerta da Corrente (Limite: 400km)
-  const ultimaLubri = entries.find(e => e.type === 'despesa' && (e.titulo?.toLowerCase().includes('corrente') || e.titulo?.toLowerCase().includes('lubri')));
-  const kmDesdeLubri = ultimaLubri && ultimaLubri.odometro ? config.odometro - ultimaLubri.odometro : 0;
-  const limiteLubri = 400;
-  const restanteLubri = Math.max(0, limiteLubri - kmDesdeLubri);
-  const pctLubri = ultimaLubri ? Math.max(0, Math.min(100, (restanteLubri / limiteLubri) * 100)) : 0;
-
   return (
-    <div className="flex flex-col items-center justify-center h-full pt-4 space-y-8 animate-fade-in-up">
-      <div className="relative w-full max-w-[260px] aspect-[2/1] mx-auto mt-4">
+    <div className="flex flex-col items-center justify-center h-full pt-10 space-y-12 animate-fade-in-up">
+      <div className="relative w-full max-w-[300px] aspect-[2/1] mx-auto mt-8">
         <svg viewBox="0 0 200 110" className="w-full h-full drop-shadow-[0_0_15px_rgba(34,211,238,0.1)]">
           <defs>
             <linearGradient id="fuelGradient" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -282,66 +227,24 @@ function TabPainel({ currentFuel, tanqueTotal, config, entries }) {
             <circle cx="100" cy="100" r="3" fill="#22d3ee" />
           </g>
         </svg>
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center w-full pointer-events-none">
-          <div className="flex items-center space-x-2 text-cyan-400 mb-0.5" style={{ textShadow: '0 0 10px rgba(34,211,238,0.5)' }}>
-            <Fuel size={14} />
-            <span className="text-2xl font-bold font-mono tracking-wider">{currentFuel.toFixed(1)}L</span>
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center w-full pointer-events-none">
+          <div className="flex items-center space-x-2 text-cyan-400 mb-1" style={{ textShadow: '0 0 10px rgba(34,211,238,0.5)' }}>
+            <Fuel size={16} />
+            <span className="text-3xl font-bold font-mono tracking-wider">{currentFuel.toFixed(1)}L</span>
           </div>
-          <span className="text-[9px] text-cyan-700 font-bold tracking-[0.2em] uppercase">Combustível</span>
+          <span className="text-[10px] text-cyan-700 font-bold tracking-[0.2em] uppercase">Fuel Level</span>
         </div>
       </div>
-
-      <div className="grid grid-cols-2 gap-3 w-full px-1">
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-3 flex flex-col items-center justify-center backdrop-blur-sm">
-          <Droplets className="text-emerald-400 mb-1" size={20} />
-          <span className="text-[10px] text-slate-400 uppercase tracking-wider mb-0.5">Tanque Info</span>
-          <span className="text-base font-bold text-slate-200">{((currentFuel/tanqueTotal)*100).toFixed(0)}% Cheio</span>
+      <div className="grid grid-cols-2 gap-4 w-full mt-16 px-2">
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col items-center justify-center backdrop-blur-sm">
+          <Droplets className="text-emerald-400 mb-2" size={24} />
+          <span className="text-xs text-slate-400 uppercase tracking-wider mb-1">Tanque Info</span>
+          <span className="text-lg font-bold text-slate-200">{((currentFuel/tanqueTotal)*100).toFixed(0)}% Cheio</span>
         </div>
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-3 flex flex-col items-center justify-center backdrop-blur-sm">
-          <Gauge className="text-purple-400 mb-1" size={20} />
-          <span className="text-[10px] text-slate-400 uppercase tracking-wider mb-0.5">Autonomia Est.</span>
-          <span className="text-base font-bold text-slate-200">~{(currentFuel * config.kmL).toFixed(0)} km</span>
-        </div>
-      </div>
-
-      {/* SEÇÃO DE ALERTAS DE MANUTENÇÃO (NOVA) */}
-      <div className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 backdrop-blur-sm space-y-4">
-        <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider border-b border-white/10 pb-2 flex items-center">
-          <Wrench size={14} className="text-cyan-400 mr-2" /> Status de Manutenção
-        </h3>
-        
-        <div className="space-y-3">
-          {/* Alerta de Óleo */}
-          <div>
-            <div className="flex justify-between text-xs mb-1">
-              <span className="text-slate-300 font-medium">Troca de Óleo (1.500km)</span>
-              <span className={`font-mono ${pctOleo < 20 ? 'text-red-400 font-bold' : 'text-slate-400'}`}>
-                {ultimaTrocaOleo ? `${restanteOleo} km restam` : 'Sem registros'}
-              </span>
-            </div>
-            <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-slate-800">
-              <div 
-                className={`h-full rounded-full transition-all duration-500 ${pctOleo < 20 ? 'bg-red-500 shadow-[0_0_10px_#ef4444]' : pctOleo < 50 ? 'bg-yellow-500' : 'bg-emerald-500'}`} 
-                style={{ width: `${ultimaTrocaOleo ? pctOleo : 0}%` }}
-              ></div>
-            </div>
-          </div>
-
-          {/* Alerta de Corrente */}
-          <div>
-            <div className="flex justify-between text-xs mb-1">
-              <span className="text-slate-300 font-medium">Lubrificação da Corrente (400km)</span>
-              <span className={`font-mono ${pctLubri < 20 ? 'text-red-400 font-bold' : 'text-slate-400'}`}>
-                {ultimaLubri ? `${restanteLubri} km restam` : 'Sem registros'}
-              </span>
-            </div>
-            <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-slate-800">
-              <div 
-                className={`h-full rounded-full transition-all duration-500 ${pctLubri < 20 ? 'bg-red-500 shadow-[0_0_10px_#ef4444]' : pctLubri < 50 ? 'bg-yellow-500' : 'bg-emerald-500'}`} 
-                style={{ width: `${ultimaLubri ? pctLubri : 0}%` }}
-              ></div>
-            </div>
-          </div>
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col items-center justify-center backdrop-blur-sm">
+          <Gauge className="text-purple-400 mb-2" size={24} />
+          <span className="text-xs text-slate-400 uppercase tracking-wider mb-1">Autonomia Est.</span>
+          <span className="text-lg font-bold text-slate-200">~{(currentFuel * config.kmL).toFixed(0)} km</span>
         </div>
       </div>
     </div>
@@ -363,7 +266,7 @@ function TabLog({ entries, onSelectEntry }) {
         sortedEntries.map(entry => (
           <div 
             key={entry.id} 
-            onClick={() => onSelectEntry(entry)} 
+            onClick={() => onSelectEntry(entry)} // Abre o Modal
             className="bg-[#0f172a]/80 backdrop-blur-md border border-slate-800 rounded-2xl p-4 flex items-center justify-between shadow-lg cursor-pointer hover:bg-slate-800/80 hover:border-cyan-900/50 transition-colors"
           >
             <div className="flex items-center space-x-4">
@@ -742,7 +645,7 @@ function ModalAbastecimento({ onClose, config, setConfig, currentFuel, setCurren
   );
 }
 
-function ModalDespesa({ onClose, config, setEntries }) {
+function ModalDespesa({ onClose, setEntries }) {
   const today = new Date().toISOString().split('T')[0];
   const [formData, setFormData] = useState({ data: today, titulo: '', valor: '', descricao: '' });
   
@@ -751,15 +654,7 @@ function ModalDespesa({ onClose, config, setEntries }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     const dataRegistro = new Date(formData.data + 'T12:00:00Z').toISOString();
-    setEntries(prev => [{ 
-      id: Date.now(), 
-      type: 'despesa', 
-      date: dataRegistro, 
-      titulo: formData.titulo, 
-      valor: parseFloat(formData.valor) || 0, 
-      odometro: parseFloat(config.odometro), // Salva automaticamente o Km atual para monitorar alertas!
-      descricao: formData.descricao 
-    }, ...prev]);
+    setEntries(prev => [{ id: Date.now(), type: 'despesa', date: dataRegistro, titulo: formData.titulo, valor: parseFloat(formData.valor) || 0, descricao: formData.descricao }, ...prev]);
     onClose();
   };
 
@@ -852,6 +747,7 @@ function ModalOdometro({ onClose, config, setConfig, currentFuel, setCurrentFuel
   );
 }
 
+// --- NOVO: Modal de Detalhes e Edição ---
 function ModalDetalhes({ entry, onClose, setEntries }) {
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
@@ -867,8 +763,10 @@ function ModalDetalhes({ entry, onClose, setEntries }) {
   const handleSaveEdit = () => {
     let updatedEntry = { ...formData };
     
+    // Ajusta a data
     updatedEntry.date = new Date(formData.data + 'T12:00:00Z').toISOString();
     
+    // Conversões de número
     if (updatedEntry.type === 'abastecimento') {
       updatedEntry.litros = parseFloat(formData.litros) || 0;
       updatedEntry.valorTotal = parseFloat(formData.valorTotal) || 0;
@@ -876,7 +774,6 @@ function ModalDetalhes({ entry, onClose, setEntries }) {
       updatedEntry.precoLitro = (updatedEntry.litros > 0 && updatedEntry.valorTotal > 0) ? parseFloat((updatedEntry.valorTotal / updatedEntry.litros).toFixed(2)) : 0;
     } else if (updatedEntry.type === 'despesa') {
       updatedEntry.valor = parseFloat(formData.valor) || 0;
-      updatedEntry.odometro = parseFloat(formData.odometro) || 0;
     }
 
     setEntries(prev => prev.map(e => e.id === entry.id ? updatedEntry : e));
@@ -888,6 +785,7 @@ function ModalDetalhes({ entry, onClose, setEntries }) {
     onClose();
   };
 
+  // Cores dinâmicas baseadas no tipo
   const colorData = {
     abastecimento: { bg: 'from-emerald-600 to-cyan-500', icon: Fuel, text: 'text-emerald-400', border: 'border-emerald-500/30' },
     despesa: { bg: 'from-red-600 to-orange-500', icon: Wrench, text: 'text-red-400', border: 'border-red-500/30' },
@@ -912,6 +810,7 @@ function ModalDetalhes({ entry, onClose, setEntries }) {
           </div>
 
           {!isEditing ? (
+            // --- MODO VISUALIZAÇÃO ---
             <div className="space-y-4">
               <div className="flex justify-between items-start pb-4 border-b border-slate-800">
                 <div>
@@ -926,6 +825,7 @@ function ModalDetalhes({ entry, onClose, setEntries }) {
                 {entry.isFullTank && <span className="px-2 py-1 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">Tanque Cheio</span>}
               </div>
 
+              {/* Informações específicas do tipo */}
               <div className="grid grid-cols-2 gap-4 py-2">
                 {entry.type === 'abastecimento' && (
                   <>
@@ -936,10 +836,7 @@ function ModalDetalhes({ entry, onClose, setEntries }) {
                   </>
                 )}
                 {entry.type === 'despesa' && (
-                  <>
-                    <div><p className="text-xs text-slate-500 uppercase">Valor Total</p><p className={`font-mono text-xl font-bold ${theme.text}`}>R$ {entry.valor?.toFixed(2)}</p></div>
-                    {entry.odometro && <div><p className="text-xs text-slate-500 uppercase">Odômetro</p><p className="font-mono text-slate-200 font-bold">{entry.odometro} km</p></div>}
-                  </>
+                  <div><p className="text-xs text-slate-500 uppercase">Valor Total</p><p className={`font-mono text-xl font-bold ${theme.text}`}>R$ {entry.valor?.toFixed(2)}</p></div>
                 )}
                 {entry.type === 'viagem' && (
                   <>
@@ -949,6 +846,7 @@ function ModalDetalhes({ entry, onClose, setEntries }) {
                 )}
               </div>
 
+              {/* Descrição em Destaque */}
               <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4 mt-2">
                 <p className="text-xs text-slate-400 uppercase mb-1 flex items-center"><Info size={14} className="mr-1"/> Descrição</p>
                 <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">
@@ -956,6 +854,7 @@ function ModalDetalhes({ entry, onClose, setEntries }) {
                 </p>
               </div>
 
+              {/* Botões de Ação */}
               <div className="flex gap-3 pt-4 mt-4 border-t border-slate-800">
                 <button onClick={() => setIsEditing(true)} className="flex-1 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white font-bold py-3 rounded-xl transition-colors flex justify-center items-center">
                   <Edit2 size={16} className="mr-2" /> Editar
@@ -966,6 +865,7 @@ function ModalDetalhes({ entry, onClose, setEntries }) {
               </div>
             </div>
           ) : (
+            // --- MODO EDIÇÃO ---
             <div className="space-y-4">
               <div>
                 <label className="text-xs text-slate-400 ml-1">Data</label>
@@ -976,7 +876,6 @@ function ModalDetalhes({ entry, onClose, setEntries }) {
                 <>
                   <div><label className="text-xs text-slate-400 ml-1">Título</label><input type="text" name="titulo" value={formData.titulo} onChange={handleChange} className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl p-3 text-white focus:border-cyan-500 focus:outline-none" /></div>
                   <div><label className="text-xs text-slate-400 ml-1">Valor Total (R$)</label><input type="number" step="0.01" name="valor" value={formData.valor} onChange={handleChange} className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl p-3 text-white font-mono focus:border-cyan-500 focus:outline-none" /></div>
-                  <div><label className="text-xs text-slate-400 ml-1">Odômetro (km)</label><input type="number" name="odometro" value={formData.odometro || ''} onChange={handleChange} className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl p-3 text-white font-mono focus:border-cyan-500 focus:outline-none" /></div>
                 </>
               )}
 
