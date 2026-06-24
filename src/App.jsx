@@ -339,9 +339,17 @@ function TabLog({ entries, onSelectEntry }) {
 
 // === NOVA TELA DE RELATÓRIOS FUNCIONAL ===
 function TabRelatorios({ entries }) {
-  const totalAbastecimento = entries.filter(e => e.type === 'abastecimento').reduce((acc, curr) => acc + (curr.valorTotal || 0), 0);
-  const totalDespesa = entries.filter(e => e.type === 'despesa').reduce((acc, curr) => acc + (curr.valor || 0), 0);
-  const totalViagemKm = entries.filter(e => e.type === 'viagem').reduce((acc, curr) => acc + (curr.kmRodados || 0), 0);
+  const [mesSelecionado, setMesSelecionado] = useState(new Date().toISOString().slice(0, 7)); // Formato YYYY-MM
+
+  // Filtra as entradas para somar apenas os valores do mês escolhido
+  const entradasDoMes = entries.filter(entry => {
+    if (!entry.date) return false;
+    return entry.date.startsWith(mesSelecionado);
+  });
+
+  const totalAbastecimento = entradasDoMes.filter(e => e.type === 'abastecimento').reduce((acc, curr) => acc + (curr.valorTotal || 0), 0);
+  const totalDespesa = entradasDoMes.filter(e => e.type === 'despesa').reduce((acc, curr) => acc + (curr.valor || 0), 0);
+  const totalViagemKm = entradasDoMes.filter(e => e.type === 'viagem').reduce((acc, curr) => acc + (curr.kmRodados || 0), 0);
   const totalGasto = totalAbastecimento + totalDespesa;
 
   return (
@@ -349,42 +357,46 @@ function TabRelatorios({ entries }) {
       <h2 className="text-lg font-bold text-slate-300 flex items-center">
         <BarChart2 className="mr-2 text-cyan-500" size={20} /> Relatórios Financeiros
       </h2>
-      
-      <div className="grid grid-cols-2 gap-4">
-        <div className="bg-[#0f172a]/80 backdrop-blur-md border border-slate-800 rounded-2xl p-4 flex flex-col items-center justify-center shadow-lg">
-          <span className="text-[10px] text-slate-400 uppercase tracking-wider mb-1">Total Gasto</span>
-          <span className="text-xl font-bold text-slate-200">R$ {totalGasto.toFixed(2)}</span>
+
+      {/* Filtro de Mês */}
+      <div className="bg-[#0f172a]/80 backdrop-blur-md border border-slate-800 rounded-2xl p-4 flex items-center justify-between shadow-lg">
+        <div className="flex items-center text-slate-300">
+          <Calendar size={18} className="mr-2 text-cyan-500" />
+          <span className="text-sm font-bold">Mês:</span>
         </div>
-        <div className="bg-[#0f172a]/80 backdrop-blur-md border border-slate-800 rounded-2xl p-4 flex flex-col items-center justify-center shadow-lg">
-          <span className="text-[10px] text-slate-400 uppercase tracking-wider mb-1">Km em Viagens</span>
-          <span className="text-xl font-bold text-purple-400">{totalViagemKm.toFixed(1)} km</span>
+        <input 
+          type="month" 
+          value={mesSelecionado}
+          onChange={(e) => setMesSelecionado(e.target.value)}
+          className="bg-slate-900 border border-slate-700 text-slate-200 rounded-xl py-2 px-3 focus:outline-none focus:border-cyan-500 font-mono text-sm"
+        />
+      </div>
+      
+      {/* Total Geral do Mês */}
+      <div className="bg-[#0f172a]/80 backdrop-blur-md border border-slate-800 rounded-2xl p-5 flex flex-col items-center justify-center shadow-lg">
+        <span className="text-xs text-slate-400 uppercase tracking-wider mb-1">Custo Total no Mês</span>
+        <span className="text-3xl font-black text-emerald-400">R$ {totalGasto.toFixed(2)}</span>
+      </div>
+
+      {/* Blocos Individuais */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-col items-center shadow-lg transition-colors hover:border-emerald-500/50">
+          <div className="bg-emerald-500/20 p-3 rounded-full text-emerald-400 mb-3"><Fuel size={24} /></div>
+          <span className="text-[10px] text-slate-400 uppercase tracking-wider mb-1 text-center">Abastecimentos</span>
+          <span className="text-lg font-bold text-slate-200">R$ {totalAbastecimento.toFixed(2)}</span>
+        </div>
+        
+        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-col items-center shadow-lg transition-colors hover:border-red-500/50">
+          <div className="bg-red-500/20 p-3 rounded-full text-red-400 mb-3"><Wrench size={24} /></div>
+          <span className="text-[10px] text-slate-400 uppercase tracking-wider mb-1 text-center">Manutenções</span>
+          <span className="text-lg font-bold text-slate-200">R$ {totalDespesa.toFixed(2)}</span>
         </div>
       </div>
 
-      <div className="bg-[#0f172a]/80 backdrop-blur-md border border-slate-800 rounded-2xl p-5 shadow-lg space-y-5">
-        <h3 className="text-sm font-bold text-slate-300 border-b border-slate-800 pb-2">Distribuição de Gastos</h3>
-        
-        <div className="space-y-4 pt-2">
-          <div>
-            <div className="flex justify-between text-xs mb-1">
-              <span className="text-slate-300 flex items-center"><Fuel size={14} className="text-emerald-400 mr-2"/> Abastecimentos</span>
-              <span className="font-mono text-emerald-400 font-bold">R$ {totalAbastecimento.toFixed(2)}</span>
-            </div>
-            <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-slate-800">
-              <div className="bg-emerald-500 h-full rounded-full" style={{ width: totalGasto > 0 ? `${(totalAbastecimento/totalGasto)*100}%` : '0%' }}></div>
-            </div>
-          </div>
-
-          <div>
-            <div className="flex justify-between text-xs mb-1">
-              <span className="text-slate-300 flex items-center"><Wrench size={14} className="text-red-400 mr-2"/> Manutenções</span>
-              <span className="font-mono text-red-400 font-bold">R$ {totalDespesa.toFixed(2)}</span>
-            </div>
-            <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-slate-800">
-              <div className="bg-red-500 h-full rounded-full" style={{ width: totalGasto > 0 ? `${(totalDespesa/totalGasto)*100}%` : '0%' }}></div>
-            </div>
-          </div>
-        </div>
+      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-col items-center shadow-lg transition-colors hover:border-purple-500/50">
+          <div className="bg-purple-500/20 p-3 rounded-full text-purple-400 mb-3"><Map size={24} /></div>
+          <span className="text-[10px] text-slate-400 uppercase tracking-wider mb-1">Km em Viagens (Mês)</span>
+          <span className="text-xl font-bold text-slate-200">{totalViagemKm.toFixed(1)} km</span>
       </div>
     </div>
   );
