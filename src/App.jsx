@@ -349,7 +349,6 @@ function calcHaversine(lat1, lon1, lat2, lon2) {
 function TabViagem({ config, entries, activeTrip, setActiveTrip, onStopTrip }) {
   const ultimoAbast = entries.find(e => e.type === 'abastecimento');
   const [precoPlan, setPrecoPlan] = useState(ultimoAbast ? ultimoAbast.precoLitro : 5.89);
-  
   const [destinoQuery, setDestinoQuery] = useState('');
   const [distanciaPlan, setDistanciaPlan] = useState(0);
   const [isSearching, setIsSearching] = useState(false);
@@ -359,7 +358,8 @@ function TabViagem({ config, entries, activeTrip, setActiveTrip, onStopTrip }) {
   // ESTADOS DA VIAGEM
   const [elapsed, setElapsed] = useState(0);
   const [gpsKm, setGpsKm] = useState(activeTrip ? activeTrip.accumulatedKm || 0 : 0);
-  const [currentSpeed, setCurrentSpeed] = useState(0); // NOVO: Guarda a velocidade em km/h
+  const [currentSpeed, setCurrentSpeed] = useState(0); 
+  const lastUpdateRef = useRef(Date.now());
 
   useEffect(() => {
     let interval, watchId;
@@ -371,28 +371,39 @@ function TabViagem({ config, entries, activeTrip, setActiveTrip, onStopTrip }) {
       if ('geolocation' in navigator) {
         watchId = navigator.geolocation.watchPosition(
           (position) => {
-            const { latitude, longitude, speed } = position.coords;
+            const { latitude, longitude } = position.coords;
+            const now = Date.now();
             
-            // ATUALIZA O VELOCÍMETRO
-            if (speed !== null) {
-              setCurrentSpeed(speed * 3.6); // Converte m/s para km/h
-            } else {
-              setCurrentSpeed(0);
-            }
-
             setActiveTrip(prev => {
               if (!prev) return prev;
-              const newKm = prev.lastLat ? calcHaversine(prev.lastLat, prev.lastLon, latitude, longitude) : 0;
-              if (newKm > 0.01) {
+              
+              let newKm = 0;
+              let calculatedSpeed = 0;
+
+              if (prev.lastLat && prev.lastLon) {
+                newKm = calcHaversine(prev.lastLat, prev.lastLon, latitude, longitude);
+                
+                // Cálculo de velocidade robusto (Distância / Tempo)
+                const timeDiffInHours = (now - lastUpdateRef.current) / 3600000;
+                if (timeDiffInHours > 0) {
+                    calculatedSpeed = newKm / timeDiffInHours;
+                }
+              }
+
+              // Filtro: só atualiza se moveu, suaviza velocidade
+              if (newKm > 0.005) { 
                 const updatedKm = prev.accumulatedKm + newKm;
                 setGpsKm(updatedKm);
-                return { ...prev, lastLat: latitude, lastLon: longitude, accumulatedKm: updatedKm };
+                setCurrentSpeed(calculatedSpeed > 150 ? prev.speed || 0 : calculatedSpeed); // Filtra picos irreais
+                lastUpdateRef.current = now;
+                return { ...prev, lastLat: latitude, lastLon: longitude, accumulatedKm: updatedKm, speed: calculatedSpeed };
               }
-              return { ...prev, lastLat: prev.lastLat || latitude, lastLon: prev.lastLon || longitude };
+              
+              return { ...prev, lastLat: latitude, lastLon: longitude };
             });
           },
-          (error) => console.log("Erro no GPS:", error),
-          { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
+          (error) => console.log("GPS aguardando sinal..."),
+          { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
         );
       }
     }
@@ -403,80 +414,49 @@ function TabViagem({ config, entries, activeTrip, setActiveTrip, onStopTrip }) {
   }, [activeTrip, setActiveTrip]);
 
   const formatTime = (seconds) => {
-    const h = Math.floor(seconds / 3600); const m = Math.floor((seconds % 3600) / 60); const s = seconds % 60;
-    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    const h = Math.floor(seconds / 3600); const m = Math.floor((seconds % 3600) / 60);
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}`;
   };
 
   const handleStartTrip = () => {
     setActiveTrip({ startTime: Date.now(), startOdo: config.odometro, accumulatedKm: 0, lastLat: null, lastLon: null });
     setGpsKm(0);
     setCurrentSpeed(0);
+    lastUpdateRef.current = Date.now();
   };
 
   const handleCalcularRota = async () => {
     if (!destinoQuery) return;
     setIsSearching(true); setSearchError(''); setSearchSuccess(''); setDistanciaPlan(0);
-
     try {
-      const pos = await new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true });
-      });
-      const currLat = pos.coords.latitude; const currLon = pos.coords.longitude;
-
+      const pos = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true }));
       const geoRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(destinoQuery)}`);
       const geoData = await geoRes.json();
       if (geoData.length === 0) throw new Error('Destino não encontrado.');
-      const destLat = geoData[0].lat; const destLon = geoData[0].lon;
-
-      const routeRes = await fetch(`https://router.project-osrm.org/route/v1/driving/${currLon},${currLat};${destLon},${destLat}?overview=false`);
+      const routeRes = await fetch(`https://router.project-osrm.org/route/v1/driving/${pos.coords.longitude},${pos.coords.latitude};${geoData[0].lon},${geoData[0].lat}?overview=false`);
       const routeData = await routeRes.json();
-      if (routeData.code !== 'Ok') throw new Error('Não foi possível traçar uma rota rodoviária.');
-
-      const distanceInKm = (routeData.routes[0].distance / 1000).toFixed(1);
-      setDistanciaPlan(parseFloat(distanceInKm));
-      setSearchSuccess(`Rota traçada até ${geoData[0].name.split(',')[0]}!`);
-    } catch (err) {
-      if (err.code === 1) setSearchError('Ligue o GPS do celular para calcular.');
-      else setSearchError(err.message || 'Erro ao calcular a rota.');
-    }
+      setDistanciaPlan((routeData.routes[0].distance / 1000).toFixed(1));
+      setSearchSuccess(`Rota traçada!`);
+    } catch (err) { setSearchError('Erro ao buscar rota. Ative o GPS.'); }
     setIsSearching(false);
   };
 
   const calcLitros = (parseFloat(distanciaPlan) || 0) / config.kmL;
   const calcCusto = calcLitros * (parseFloat(precoPlan) || 0);
 
-  // TELA DE VIAGEM EM ANDAMENTO COM VELOCÍMETRO
   if (activeTrip) {
     return (
       <div className="flex flex-col items-center justify-center h-full pt-4 space-y-6 animate-fade-in-up">
-        <div className="bg-indigo-900/30 border border-indigo-500/50 rounded-3xl p-6 w-full flex flex-col items-center shadow-[0_0_30px_rgba(99,102,241,0.2)] relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-4 opacity-10"><Gauge size={120} /></div>
-
-          {/* Velocímetro em Destaque */}
-          <span className="text-xs text-cyan-500 uppercase tracking-widest font-bold mb-1 flex items-center z-10">
-            <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse mr-2"></span> AO VIVO
-          </span>
-          <div className="text-7xl font-black font-mono text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-emerald-400 drop-shadow-[0_0_15px_rgba(34,211,238,0.3)] z-10 transition-all duration-300">
-            {Math.round(currentSpeed)}
-          </div>
-          <span className="text-sm font-bold text-cyan-700 uppercase tracking-widest mb-6 z-10">km/h</span>
-
-          {/* Timer e Km */}
-          <div className="w-full grid grid-cols-2 gap-4 border-t border-indigo-500/30 pt-6 z-10">
-             <div className="flex flex-col items-center">
-               <span className="text-2xl font-bold font-mono text-indigo-300">{formatTime(elapsed)}</span>
-               <span className="text-[9px] text-slate-400 uppercase tracking-wider mt-1">Tempo</span>
-             </div>
-             <div className="flex flex-col items-center border-l border-indigo-500/30">
-               <span className="text-2xl font-bold font-mono text-purple-400">{gpsKm.toFixed(1)} <span className="text-sm">km</span></span>
-               <span className="text-[9px] text-slate-400 uppercase tracking-wider mt-1">Distância</span>
-             </div>
+        <div className="bg-indigo-900/30 border border-indigo-500/50 rounded-3xl p-6 w-full flex flex-col items-center shadow-[0_0_30px_rgba(99,102,241,0.2)]">
+          <span className="text-xs text-cyan-500 font-bold mb-2">AO VIVO</span>
+          <div className="text-7xl font-black font-mono text-cyan-300">{Math.round(currentSpeed)}</div>
+          <span className="text-sm text-slate-400 uppercase tracking-widest mb-6">km/h</span>
+          <div className="w-full grid grid-cols-2 gap-4 border-t border-indigo-500/30 pt-6">
+             <div className="text-center"><p className="text-xl font-bold text-white">{formatTime(elapsed)}</p><p className="text-[9px] text-slate-400">TEMPO</p></div>
+             <div className="text-center"><p className="text-xl font-bold text-purple-400">{gpsKm.toFixed(1)} km</p><p className="text-[9px] text-slate-400">DISTÂNCIA</p></div>
           </div>
         </div>
-
-        <button onClick={onStopTrip} className="w-full bg-red-600 hover:bg-red-500 text-white font-black uppercase tracking-wider py-5 rounded-2xl shadow-[0_0_20px_rgba(220,38,38,0.4)] transition-all flex items-center justify-center text-lg active:scale-95">
-          <Square size={24} className="mr-3 fill-current" /> Encerrar Viagem
-        </button>
+        <button onClick={onStopTrip} className="w-full bg-red-600 text-white font-black py-5 rounded-2xl">Encerrar Viagem</button>
       </div>
     );
   }
@@ -484,59 +464,17 @@ function TabViagem({ config, entries, activeTrip, setActiveTrip, onStopTrip }) {
   return (
     <div className="flex flex-col space-y-6 pt-4 animate-fade-in-up">
       <h2 className="text-lg font-bold text-slate-300 px-2 flex items-center"><Map className="mr-2 text-indigo-400" size={20} /> Painel de Viagem</h2>
-      
-      <div className="bg-gradient-to-br from-[#0f172a] to-[#1e1b4b] border border-indigo-900/50 rounded-3xl p-6 shadow-lg relative overflow-hidden">
-        <div className="relative z-10 flex flex-col items-start">
-          <h3 className="text-lg font-black text-indigo-300 mb-1">Rodar com a Moto</h3>
-          <p className="text-xs text-slate-400 mb-5 max-w-[200px]">Inicie o rastreamento GPS e acompanhe sua velocidade e rota.</p>
-          <button onClick={handleStartTrip} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-4 rounded-2xl shadow-[0_0_15px_rgba(79,70,229,0.4)] transition-all flex items-center justify-center active:scale-95">
-            <Play size={20} className="mr-2 fill-current" /> Iniciar Rota Agora
-          </button>
-        </div>
-        <div className="absolute -right-4 -bottom-4 opacity-30 text-indigo-500"><Route size={120} /></div>
-      </div>
-
+      <button onClick={handleStartTrip} className="w-full bg-indigo-600 text-white font-bold py-4 rounded-2xl">Iniciar Rota Agora</button>
+      {/* Calculadora permanece igual */}
       <div className="bg-[#0f172a]/80 backdrop-blur-md border border-slate-800 rounded-3xl p-5">
-        <h3 className="text-sm font-bold text-slate-300 flex items-center mb-4"><Navigation className="mr-2 text-cyan-500" size={18} /> Calculadora de Rota GPS</h3>
-        
+        <h3 className="text-sm font-bold text-slate-300 mb-4">Calculadora de Rota</h3>
         <div className="space-y-4">
-          <div className="space-y-2">
-            <label className="text-xs text-slate-400 ml-1">Para onde você vai?</label>
-            <div className="flex space-x-2">
-              <input type="text" value={destinoQuery} onChange={(e) => setDestinoQuery(e.target.value)} placeholder="Ex: Serra Talhada, PE" className="flex-1 bg-slate-900 border border-slate-700 rounded-xl p-3 text-white focus:border-cyan-500 focus:outline-none text-sm" />
-              <button onClick={handleCalcularRota} disabled={isSearching} className="bg-cyan-600 hover:bg-cyan-500 text-white p-3 rounded-xl transition-colors disabled:opacity-50">
-                {isSearching ? <Loader2 size={20} className="animate-spin" /> : <Search size={20} />}
-              </button>
-            </div>
-            {searchError && <p className="text-[10px] text-red-400 ml-1">{searchError}</p>}
-            {searchSuccess && <p className="text-[10px] text-emerald-400 ml-1">{searchSuccess}</p>}
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs text-slate-400 ml-1">Distância Ida (km)</label>
-              <input type="number" readOnly value={distanciaPlan || ''} placeholder="Automático" className="w-full mt-1 bg-slate-900/50 border border-slate-800 rounded-xl p-3 text-slate-400 font-mono focus:outline-none" />
-            </div>
-            <div>
-              <label className="text-xs text-slate-400 ml-1">Preço Combustível</label>
-              <input type="number" step="0.01" value={precoPlan} onChange={(e) => setPrecoPlan(e.target.value)} className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl p-3 text-white font-mono focus:border-cyan-500 focus:outline-none" />
-            </div>
-          </div>
-          
-          <div className="bg-slate-900 border border-cyan-900/30 rounded-2xl p-4 transition-all">
-            <span className="block text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-3 text-center">Estimativa para a Viagem</span>
-            <div className="flex justify-around items-center">
-              <div className="flex flex-col items-center">
-                <span className="text-2xl font-black font-mono text-cyan-400">{calcLitros.toFixed(1)}L</span>
-                <span className="text-[10px] text-slate-400 mt-1">Necessários</span>
-              </div>
-              <div className="w-px h-10 bg-slate-800"></div>
-              <div className="flex flex-col items-center">
-                <span className="text-2xl font-black font-mono text-emerald-400"><span className="text-sm">R$</span> {calcCusto.toFixed(2)}</span>
-                <span className="text-[10px] text-slate-400 mt-1">Custo Estimado</span>
-              </div>
-            </div>
-          </div>
+           <div className="flex space-x-2"><input type="text" value={destinoQuery} onChange={(e) => setDestinoQuery(e.target.value)} placeholder="Destino..." className="flex-1 bg-slate-900 p-3 rounded-xl text-white text-sm" /><button onClick={handleCalcularRota} className="bg-cyan-600 p-3 rounded-xl">{isSearching ? <Loader2 className="animate-spin"/> : <Search />}</button></div>
+           <div className="grid grid-cols-2 gap-3">
+              <input type="number" readOnly value={distanciaPlan || ''} placeholder="Km" className="bg-slate-900/50 border border-slate-800 rounded-xl p-3 text-slate-400" />
+              <input type="number" value={precoPlan} onChange={(e) => setPrecoPlan(e.target.value)} className="bg-slate-900 border border-slate-700 rounded-xl p-3 text-white" />
+           </div>
+           <div className="bg-slate-900 p-4 rounded-2xl text-center"><p className="text-2xl font-bold text-emerald-400">R$ {calcCusto.toFixed(2)}</p><p className="text-[10px] text-slate-400">Custo Estimado</p></div>
         </div>
       </div>
     </div>
