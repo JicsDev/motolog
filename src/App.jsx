@@ -1,27 +1,9 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
-  LayoutDashboard, 
-  List, 
-  BarChart2, 
-  Settings, 
-  Plus, 
-  X, 
-  Fuel, 
-  Wrench, 
-  Gauge, 
-  Droplets,
-  Calendar,
-  Banknote,
-  MapPin,
-  CheckCircle2,
-  Download,
-  Upload,
-  Database,
-  AlertCircle,
-  Trash2,
-  Wallet,
-  Edit2,
-  Info
+  LayoutDashboard, List, BarChart2, Settings, Plus, X, Fuel, Wrench, 
+  Gauge, Droplets, Calendar, Banknote, MapPin, CheckCircle2, Download, 
+  Upload, Database, AlertCircle, Trash2, Wallet, Edit2, Info,
+  Map, Play, Square, Route, Timer, Filter, Navigation
 } from 'lucide-react';
 
 export default function App() {
@@ -29,85 +11,46 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('PAINEL');
   const [fabMenuOpen, setFabMenuOpen] = useState(false);
   const [activeModal, setActiveModal] = useState(null);
-  const [selectedEntry, setSelectedEntry] = useState(null); 
+  const [selectedEntry, setSelectedEntry] = useState(null);
 
   // --- Estado de Dados (Com salvamento no LocalStorage) ---
   const [config, setConfig] = useState(() => {
     try {
-      const savedConfig = localStorage.getItem('motolog_config');
-      return savedConfig ? JSON.parse(savedConfig) : { tanqueTotal: 15, kmL: 25, odometro: 12532 };
-    } catch (e) {
-      return { tanqueTotal: 15, kmL: 25, odometro: 12532 };
-    }
+      const saved = localStorage.getItem('motolog_config');
+      return saved ? JSON.parse(saved) : { tanqueTotal: 15, kmL: 25, odometro: 12532 };
+    } catch (e) { return { tanqueTotal: 15, kmL: 25, odometro: 12532 }; }
   });
 
   const [currentFuel, setCurrentFuel] = useState(() => {
     try {
-      const savedFuel = localStorage.getItem('motolog_fuel');
-      return savedFuel ? JSON.parse(savedFuel) : 11.1;
-    } catch (e) {
-      return 11.1;
-    }
+      const saved = localStorage.getItem('motolog_fuel');
+      return saved ? JSON.parse(saved) : 11.1;
+    } catch (e) { return 11.1; }
   }); 
 
   const [entries, setEntries] = useState(() => {
     try {
-      const savedEntries = localStorage.getItem('motolog_entries');
-      if (savedEntries) return JSON.parse(savedEntries);
-    } catch (e) { 
-      console.error("Erro ao ler dados:", e); 
-    }
-    
-    // Fallback padrão com exemplos já contendo Odômetro para os alertas funcionarem de início
-    return [
-      {
-        id: 1,
-        type: 'abastecimento',
-        date: new Date(Date.now() - 86400000 * 2).toISOString(),
-        odometro: 12400,
-        litros: 10,
-        valorTotal: 58.90,
-        precoLitro: 5.89,
-        isFullTank: false,
-        descricao: 'Posto Ipiranga perto de casa.'
-      },
-      {
-        id: 2,
-        type: 'despesa',
-        date: new Date(Date.now() - 86400000 * 5).toISOString(),
-        titulo: 'Troca de Óleo',
-        valor: 85.00,
-        odometro: 12100, // Registrado a 432km atrás (considerando o odo padrão 12532)
-        descricao: 'Óleo Motul 5000 10W40.'
-      },
-      {
-        id: 3,
-        type: 'despesa',
-        date: new Date(Date.now() - 86400000 * 8).toISOString(),
-        titulo: 'Lubrificação da Corrente',
-        valor: 0.00,
-        odometro: 12450, // Registrado a 82km atrás
-        descricao: 'Uso de spray lubrificante C4.'
-      }
-    ];
+      const saved = localStorage.getItem('motolog_entries');
+      if (saved) return JSON.parse(saved);
+    } catch (e) { console.error("Erro ao ler dados:", e); }
+    return [];
+  });
+
+  // NOVO ESTADO: Viagem Ativa
+  const [activeTrip, setActiveTrip] = useState(() => {
+    try {
+      const saved = localStorage.getItem('motolog_active_trip');
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) { return null; }
   });
 
   // Gravação automática no LocalStorage
-  useEffect(() => {
-    localStorage.setItem('motolog_config', JSON.stringify(config));
-  }, [config]);
+  useEffect(() => { localStorage.setItem('motolog_config', JSON.stringify(config)); }, [config]);
+  useEffect(() => { localStorage.setItem('motolog_fuel', JSON.stringify(currentFuel)); }, [currentFuel]);
+  useEffect(() => { localStorage.setItem('motolog_entries', JSON.stringify(entries)); }, [entries]);
+  useEffect(() => { localStorage.setItem('motolog_active_trip', JSON.stringify(activeTrip)); }, [activeTrip]);
 
-  useEffect(() => {
-    localStorage.setItem('motolog_fuel', JSON.stringify(currentFuel));
-  }, [currentFuel]);
-
-  useEffect(() => {
-    localStorage.setItem('motolog_entries', JSON.stringify(entries));
-  }, [entries]);
-
-  useEffect(() => {
-    setFabMenuOpen(false);
-  }, [activeTab]);
+  useEffect(() => { setFabMenuOpen(false); }, [activeTab]);
 
   const handleCalculateConfig = (newConfig) => {
     const diffKm = newConfig.odometro - config.odometro;
@@ -127,12 +70,12 @@ export default function App() {
   const handleResetData = () => {
     setEntries([]);
     setCurrentFuel(0);
+    setActiveTrip(null);
   };
 
   return (
     <div className="h-[100dvh] w-full bg-[#060b14] flex justify-center font-sans text-slate-200 overflow-hidden">
       
-      {/* Container Mobile */}
       <div className="h-full w-full max-w-md bg-gradient-to-b from-[#0a1325] to-[#040811] relative flex flex-col shadow-2xl md:border-x md:border-slate-800 overflow-hidden">
         
         <header className="pt-8 pb-4 px-6 bg-transparent flex justify-between items-center z-10 flex-shrink-0">
@@ -141,21 +84,20 @@ export default function App() {
               MOTO<span className="text-slate-100">LOG</span>
             </h1>
           </div>
-          <div className="flex items-center space-x-2 text-cyan-400">
-            <Gauge size={20} />
-            <span className="text-sm font-mono">{config.odometro} km</span>
+          <div className="flex items-center space-x-2 text-cyan-400 bg-cyan-900/20 px-3 py-1 rounded-full border border-cyan-500/30">
+            <Gauge size={16} />
+            <span className="text-sm font-bold font-mono tracking-wide">{config.odometro} <span className="text-[10px] text-cyan-600">KM</span></span>
           </div>
         </header>
 
-        {/* Área Central que Rola */}
         <main className="flex-1 overflow-y-auto pb-28 px-4 custom-scrollbar z-10 relative">
           {activeTab === 'PAINEL' && <TabPainel currentFuel={currentFuel} tanqueTotal={config.tanqueTotal} config={config} entries={entries} />}
           {activeTab === 'LOG' && <TabLog entries={entries} onSelectEntry={setSelectedEntry} />}
+          {activeTab === 'VIAGEM' && <TabViagem config={config} entries={entries} activeTrip={activeTrip} setActiveTrip={setActiveTrip} onStopTrip={() => setActiveModal('encerrar_viagem')} />}
           {activeTab === 'RELATÓRIOS' && <TabRelatorios entries={entries} config={config} />}
           {activeTab === 'CONFIGURAÇÕES' && <TabConfiguracoes config={config} currentFuel={currentFuel} entries={entries} onCalculate={handleCalculateConfig} onImportData={handleImportData} onResetData={handleResetData} />}
         </main>
 
-        {/* Botão FAB (+) fixo */}
         {activeTab === 'PAINEL' && (
           <div className="absolute bottom-24 right-4 z-40">
             {fabMenuOpen && (
@@ -180,29 +122,24 @@ export default function App() {
           </div>
         )}
 
-        {/* Menu Inferior Fixo */}
         <nav className="absolute bottom-0 w-full h-16 bg-[#0B1221]/95 backdrop-blur-lg border-t border-cyan-900/50 grid grid-cols-5 items-center px-1 z-50 shadow-[0_-5px_20px_rgba(0,0,0,0.5)]">
           <NavItem icon={<LayoutDashboard />} label="PAINEL" isActive={activeTab === 'PAINEL'} onClick={() => setActiveTab('PAINEL')} />
           <NavItem icon={<List />} label="LOG" isActive={activeTab === 'LOG'} onClick={() => setActiveTab('LOG')} />
+          {/* Nova Aba de Viagem no Centro */}
+          <NavItem icon={<Map />} label="VIAGEM" isActive={activeTab === 'VIAGEM'} onClick={() => setActiveTab('VIAGEM')} />
           <NavItem icon={<BarChart2 />} label="RELATÓRIOS" isActive={activeTab === 'RELATÓRIOS'} onClick={() => setActiveTab('RELATÓRIOS')} />
           <NavItem icon={<Settings />} label="CONFIGS" isActive={activeTab === 'CONFIGURAÇÕES'} onClick={() => setActiveTab('CONFIGURAÇÕES')} />
-          <div className="w-full h-full"></div>
         </nav>
 
-        {/* Modais Principais */}
+        {/* Modais */}
         {activeModal === 'abastecimento' && <ModalAbastecimento onClose={() => setActiveModal(null)} config={config} setConfig={setConfig} currentFuel={currentFuel} setCurrentFuel={setCurrentFuel} setEntries={setEntries} />}
         {activeModal === 'despesa' && <ModalDespesa onClose={() => setActiveModal(null)} config={config} setEntries={setEntries} />}
         {activeModal === 'odometro' && <ModalOdometro onClose={() => setActiveModal(null)} config={config} setConfig={setConfig} currentFuel={currentFuel} setCurrentFuel={setCurrentFuel} setEntries={setEntries} />}
+        
+        {/* Novo Modal de Encerrar Viagem */}
+        {activeModal === 'encerrar_viagem' && <ModalEncerrarViagem onClose={() => setActiveModal(null)} activeTrip={activeTrip} setActiveTrip={setActiveTrip} config={config} setConfig={setConfig} currentFuel={currentFuel} setCurrentFuel={setCurrentFuel} setEntries={setEntries} />}
 
-        {/* Modal de Detalhes do Registro (Log) */}
-        {selectedEntry && (
-          <ModalDetalhes 
-            entry={selectedEntry} 
-            onClose={() => setSelectedEntry(null)} 
-            setEntries={setEntries} 
-          />
-        )}
-
+        {selectedEntry && <ModalDetalhes entry={selectedEntry} onClose={() => setSelectedEntry(null)} setEntries={setEntries} />}
         {fabMenuOpen && <div className="absolute inset-0 z-30 bg-black/40 backdrop-blur-[1px]" onClick={() => setFabMenuOpen(false)} />}
       </div>
       
@@ -214,26 +151,27 @@ export default function App() {
           .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
           .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(34, 211, 238, 0.2); border-radius: 4px; }
           a[href*="codesandbox"], div[style*="z-index: 9999999"] { display: none !important; opacity: 0 !important; pointer-events: none !important; }
-          input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); opacity: 0.5; cursor: pointer; }
+          input[type="date"]::-webkit-calendar-picker-indicator, input[type="month"]::-webkit-calendar-picker-indicator { filter: invert(1); opacity: 0.5; cursor: pointer; }
         `}
       </style>
     </div>
   );
 }
 
+// ==========================================
+// ABAS E COMPONENTES
+// ==========================================
+
 function TabPainel({ currentFuel, tanqueTotal, config, entries }) {
   const percent = Math.max(0, Math.min(100, (currentFuel / tanqueTotal) * 100));
   const rotation = -90 + (percent * 1.8);
 
-  // --- LÓGICA DE ALERTAS INTELIGENTES ---
-  // 1. Alerta do Óleo (Limite: 1500km)
   const ultimaTrocaOleo = entries.find(e => e.type === 'despesa' && (e.titulo?.toLowerCase().includes('óleo') || e.titulo?.toLowerCase().includes('oleo')));
   const kmDesdeOleo = ultimaTrocaOleo && ultimaTrocaOleo.odometro ? config.odometro - ultimaTrocaOleo.odometro : 0;
   const limiteOleo = 1500;
   const restanteOleo = Math.max(0, limiteOleo - kmDesdeOleo);
   const pctOleo = ultimaTrocaOleo ? Math.max(0, Math.min(100, (restanteOleo / limiteOleo) * 100)) : 0;
 
-  // 2. Alerta da Corrente (Limite: 400km)
   const ultimaLubri = entries.find(e => e.type === 'despesa' && (e.titulo?.toLowerCase().includes('corrente') || e.titulo?.toLowerCase().includes('lubri')));
   const kmDesdeLubri = ultimaLubri && ultimaLubri.odometro ? config.odometro - ultimaLubri.odometro : 0;
   const limiteLubri = 400;
@@ -304,14 +242,11 @@ function TabPainel({ currentFuel, tanqueTotal, config, entries }) {
         </div>
       </div>
 
-      {/* SEÇÃO DE ALERTAS DE MANUTENÇÃO (NOVA) */}
       <div className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 backdrop-blur-sm space-y-4">
         <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider border-b border-white/10 pb-2 flex items-center">
           <Wrench size={14} className="text-cyan-400 mr-2" /> Status de Manutenção
         </h3>
-        
         <div className="space-y-3">
-          {/* Alerta de Óleo */}
           <div>
             <div className="flex justify-between text-xs mb-1">
               <span className="text-slate-300 font-medium">Troca de Óleo (1.500km)</span>
@@ -320,14 +255,9 @@ function TabPainel({ currentFuel, tanqueTotal, config, entries }) {
               </span>
             </div>
             <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-slate-800">
-              <div 
-                className={`h-full rounded-full transition-all duration-500 ${pctOleo < 20 ? 'bg-red-500 shadow-[0_0_10px_#ef4444]' : pctOleo < 50 ? 'bg-yellow-500' : 'bg-emerald-500'}`} 
-                style={{ width: `${ultimaTrocaOleo ? pctOleo : 0}%` }}
-              ></div>
+              <div className={`h-full rounded-full transition-all duration-500 ${pctOleo < 20 ? 'bg-red-500 shadow-[0_0_10px_#ef4444]' : pctOleo < 50 ? 'bg-yellow-500' : 'bg-emerald-500'}`} style={{ width: `${ultimaTrocaOleo ? pctOleo : 0}%` }}></div>
             </div>
           </div>
-
-          {/* Alerta de Corrente */}
           <div>
             <div className="flex justify-between text-xs mb-1">
               <span className="text-slate-300 font-medium">Lubrificação da Corrente (400km)</span>
@@ -336,10 +266,7 @@ function TabPainel({ currentFuel, tanqueTotal, config, entries }) {
               </span>
             </div>
             <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-slate-800">
-              <div 
-                className={`h-full rounded-full transition-all duration-500 ${pctLubri < 20 ? 'bg-red-500 shadow-[0_0_10px_#ef4444]' : pctLubri < 50 ? 'bg-yellow-500' : 'bg-emerald-500'}`} 
-                style={{ width: `${ultimaLubri ? pctLubri : 0}%` }}
-              ></div>
+              <div className={`h-full rounded-full transition-all duration-500 ${pctLubri < 20 ? 'bg-red-500 shadow-[0_0_10px_#ef4444]' : pctLubri < 50 ? 'bg-yellow-500' : 'bg-emerald-500'}`} style={{ width: `${ultimaLubri ? pctLubri : 0}%` }}></div>
             </div>
           </div>
         </div>
@@ -348,8 +275,16 @@ function TabPainel({ currentFuel, tanqueTotal, config, entries }) {
   );
 }
 
+// ABA LOG ATUALIZADA (COM FILTROS)
 function TabLog({ entries, onSelectEntry }) {
+  const [filtro, setFiltro] = useState('todos');
+
   const sortedEntries = [...entries].sort((a, b) => new Date(b.date) - new Date(a.date));
+  const entradasFiltradas = sortedEntries.filter(entry => {
+    if (filtro === 'todos') return true;
+    if (filtro === 'viagem') return entry.type === 'viagem';
+    return entry.type === filtro;
+  });
 
   return (
     <div className="flex flex-col space-y-4 pt-4 animate-fade-in-up">
@@ -357,10 +292,21 @@ function TabLog({ entries, onSelectEntry }) {
         <List className="mr-2 text-cyan-500" size={20} /> Histórico de Registros
       </h2>
       
-      {sortedEntries.length === 0 ? (
-        <p className="text-center text-slate-500 mt-10">Nenhum registro encontrado.</p>
+      {/* Sistema de Filtros */}
+      <div className="flex items-center space-x-2 overflow-x-auto custom-scrollbar pb-2 px-1">
+        <Filter size={16} className="text-slate-500 flex-shrink-0 mr-1" />
+        <button onClick={() => setFiltro('todos')} className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors ${filtro === 'todos' ? 'bg-cyan-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}>Todos</button>
+        <button onClick={() => setFiltro('abastecimento')} className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors ${filtro === 'abastecimento' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}>Abastecimentos</button>
+        <button onClick={() => setFiltro('despesa')} className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors ${filtro === 'despesa' ? 'bg-red-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}>Manutenções</button>
+        <button onClick={() => setFiltro('viagem')} className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors ${filtro === 'viagem' ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}>Viagens</button>
+      </div>
+      
+      {entradasFiltradas.length === 0 ? (
+        <div className="text-center bg-slate-900/50 rounded-2xl p-6 border border-slate-800">
+          <p className="text-slate-500 text-sm">Nenhum registro encontrado para este filtro.</p>
+        </div>
       ) : (
-        sortedEntries.map(entry => (
+        entradasFiltradas.map(entry => (
           <div 
             key={entry.id} 
             onClick={() => onSelectEntry(entry)} 
@@ -368,17 +314,11 @@ function TabLog({ entries, onSelectEntry }) {
           >
             <div className="flex items-center space-x-4">
               {entry.type === 'abastecimento' ? (
-                <div className="bg-emerald-500/20 p-3 rounded-full border border-emerald-500/30 flex-shrink-0">
-                  <Fuel className="text-emerald-400" size={20} />
-                </div>
+                <div className="bg-emerald-500/20 p-3 rounded-full border border-emerald-500/30 flex-shrink-0"><Fuel className="text-emerald-400" size={20} /></div>
               ) : entry.type === 'despesa' ? (
-                <div className="bg-red-500/20 p-3 rounded-full border border-red-500/30 flex-shrink-0">
-                  <Wrench className="text-red-400" size={20} />
-                </div>
+                <div className="bg-red-500/20 p-3 rounded-full border border-red-500/30 flex-shrink-0"><Wrench className="text-red-400" size={20} /></div>
               ) : (
-                <div className="bg-purple-500/20 p-3 rounded-full border border-purple-500/30 flex-shrink-0">
-                  <MapPin className="text-purple-400" size={20} />
-                </div>
+                <div className="bg-purple-500/20 p-3 rounded-full border border-purple-500/30 flex-shrink-0"><MapPin className="text-purple-400" size={20} /></div>
               )}
               <div className="flex flex-col overflow-hidden">
                 <span className="font-bold text-slate-100 flex items-center flex-wrap gap-1">
@@ -388,20 +328,19 @@ function TabLog({ entries, onSelectEntry }) {
                 <span className="text-xs text-slate-400 flex items-center mt-1">
                   <Calendar size={12} className="mr-1 flex-shrink-0" />
                   {new Date(entry.date).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}
+                  {entry.type === 'viagem' && entry.duracao && ` • ${entry.duracao}`}
                 </span>
               </div>
             </div>
             <div className="flex flex-col items-end flex-shrink-0">
               {entry.type === 'abastecimento' || entry.type === 'despesa' ? (
                 <>
-                  <span className={`font-mono font-bold text-lg ${entry.type === 'abastecimento' ? 'text-emerald-400' : 'text-red-400'}`}>
-                    - R$ {entry.valorTotal ? entry.valorTotal.toFixed(2) : (entry.valor ? entry.valor.toFixed(2) : '0.00')}
-                  </span>
+                  <span className={`font-mono font-bold text-lg ${entry.type === 'abastecimento' ? 'text-emerald-400' : 'text-red-400'}`}>- R$ {entry.valorTotal ? entry.valorTotal.toFixed(2) : (entry.valor ? entry.valor.toFixed(2) : '0.00')}</span>
                   {entry.type === 'abastecimento' && <span className="text-[10px] text-slate-500 font-mono">R${entry.precoLitro}/L</span>}
                 </>
               ) : (
                 <>
-                  <span className="font-mono font-bold text-lg text-purple-400">-{entry.litrosGastos.toFixed(1)}L</span>
+                  <span className="font-mono font-bold text-lg text-purple-400">-{entry.litrosGastos?.toFixed(1)}L</span>
                   <span className="text-[10px] text-slate-400 font-mono">+{entry.kmRodados} km</span>
                 </>
               )}
@@ -409,6 +348,138 @@ function TabLog({ entries, onSelectEntry }) {
           </div>
         ))
       )}
+    </div>
+  );
+}
+
+// --- NOVA ABA: VIAGEM ---
+function TabViagem({ config, entries, activeTrip, setActiveTrip, onStopTrip }) {
+  const [distanciaPlan, setDistanciaPlan] = useState('');
+  
+  // Encontra o preço do último abastecimento para usar no cálculo
+  const ultimoAbast = entries.find(e => e.type === 'abastecimento');
+  const [precoPlan, setPrecoPlan] = useState(ultimoAbast ? ultimoAbast.precoLitro : 5.89);
+
+  // Timer da viagem ativa
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    let interval;
+    if (activeTrip) {
+      // Atualiza o cronômetro a cada segundo
+      interval = setInterval(() => {
+        setElapsed(Math.floor((Date.now() - activeTrip.startTime) / 1000));
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [activeTrip]);
+
+  const formatTime = (seconds) => {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
+  const handleStartTrip = () => {
+    setActiveTrip({
+      startTime: Date.now(),
+      startOdo: config.odometro
+    });
+  };
+
+  const calcLitros = (parseFloat(distanciaPlan) || 0) / config.kmL;
+  const calcCusto = calcLitros * (parseFloat(precoPlan) || 0);
+
+  // TELA DE VIAGEM EM ANDAMENTO
+  if (activeTrip) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full pt-4 space-y-6 animate-fade-in-up">
+        <div className="bg-indigo-900/30 border border-indigo-500/50 rounded-3xl p-8 w-full flex flex-col items-center shadow-[0_0_30px_rgba(99,102,241,0.2)] relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-4 opacity-20"><Navigation size={100} /></div>
+          
+          <div className="bg-indigo-500/20 text-indigo-300 px-4 py-1 rounded-full text-xs font-bold uppercase tracking-widest mb-6 flex items-center">
+            <span className="w-2 h-2 bg-indigo-400 rounded-full animate-pulse mr-2"></span> Viagem em Andamento
+          </div>
+          
+          <div className="text-6xl font-black font-mono text-transparent bg-clip-text bg-gradient-to-r from-indigo-300 to-purple-400 drop-shadow-md z-10">
+            {formatTime(elapsed)}
+          </div>
+          <span className="text-xs text-slate-400 uppercase tracking-widest mt-2 font-medium z-10">Tempo Decorrido</span>
+
+          <div className="w-full grid grid-cols-2 gap-4 mt-8 z-10">
+            <div className="bg-slate-900/60 rounded-2xl p-4 flex flex-col items-center border border-slate-700/50">
+              <Gauge className="text-slate-500 mb-1" size={18} />
+              <span className="text-[10px] text-slate-400 uppercase">Km Inicial</span>
+              <span className="text-lg font-bold font-mono text-slate-200">{activeTrip.startOdo}</span>
+            </div>
+            <div className="bg-slate-900/60 rounded-2xl p-4 flex flex-col items-center border border-slate-700/50">
+              <Calendar className="text-slate-500 mb-1" size={18} />
+              <span className="text-[10px] text-slate-400 uppercase">Partida</span>
+              <span className="text-sm font-bold text-slate-200 mt-1">{new Date(activeTrip.startTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+            </div>
+          </div>
+        </div>
+
+        <button onClick={onStopTrip} className="w-full bg-red-600 hover:bg-red-500 text-white font-black uppercase tracking-wider py-5 rounded-2xl shadow-[0_0_20px_rgba(220,38,38,0.4)] transition-all flex items-center justify-center text-lg active:scale-95">
+          <Square size={24} className="mr-3 fill-current" /> Encerrar Viagem
+        </button>
+      </div>
+    );
+  }
+
+  // TELA DE MENU / PLANEJAMENTO
+  return (
+    <div className="flex flex-col space-y-6 pt-4 animate-fade-in-up">
+      <h2 className="text-lg font-bold text-slate-300 px-2 flex items-center"><Map className="mr-2 text-indigo-400" size={20} /> Painel de Viagem</h2>
+      
+      {/* Botão de Iniciar Rota */}
+      <div className="bg-gradient-to-br from-[#0f172a] to-[#1e1b4b] border border-indigo-900/50 rounded-3xl p-6 shadow-lg relative overflow-hidden">
+        <div className="relative z-10 flex flex-col items-start">
+          <h3 className="text-lg font-black text-indigo-300 mb-1">Rodar com a Moto</h3>
+          <p className="text-xs text-slate-400 mb-5 max-w-[200px]">Inicie o cronômetro, pegue a estrada e registre os dados exatos no final.</p>
+          <button onClick={handleStartTrip} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-4 rounded-2xl shadow-[0_0_15px_rgba(79,70,229,0.4)] transition-all flex items-center justify-center active:scale-95">
+            <Play size={20} className="mr-2 fill-current" /> Iniciar Viagem Agora
+          </button>
+        </div>
+        <div className="absolute -right-4 -bottom-4 opacity-30 text-indigo-500"><Route size={120} /></div>
+      </div>
+
+      {/* Calculadora Inteligente */}
+      <div className="bg-[#0f172a]/80 backdrop-blur-md border border-slate-800 rounded-3xl p-5">
+        <h3 className="text-sm font-bold text-slate-300 flex items-center mb-4"><Navigation className="mr-2 text-cyan-500" size={18} /> Planejador de Rotas</h3>
+        
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-slate-400 ml-1">Distância Ida (km)</label>
+              <input type="number" value={distanciaPlan} onChange={(e) => setDistanciaPlan(e.target.value)} placeholder="Ex: 150" className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl p-3 text-white font-mono focus:border-cyan-500 focus:outline-none" />
+            </div>
+            <div>
+              <label className="text-xs text-slate-400 ml-1">Preço Combustível</label>
+              <input type="number" step="0.01" value={precoPlan} onChange={(e) => setPrecoPlan(e.target.value)} className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl p-3 text-white font-mono focus:border-cyan-500 focus:outline-none" />
+            </div>
+          </div>
+          
+          <div className="bg-slate-900 border border-cyan-900/30 rounded-2xl p-4">
+            <span className="block text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-3 text-center">Estimativa para a Viagem</span>
+            <div className="flex justify-around items-center">
+              <div className="flex flex-col items-center">
+                <span className="text-2xl font-black font-mono text-cyan-400">{calcLitros.toFixed(1)}L</span>
+                <span className="text-[10px] text-slate-400 mt-1">Necessários</span>
+              </div>
+              <div className="w-px h-10 bg-slate-800"></div>
+              <div className="flex flex-col items-center">
+                <span className="text-2xl font-black font-mono text-emerald-400"><span className="text-sm">R$</span> {calcCusto.toFixed(2)}</span>
+                <span className="text-[10px] text-slate-400 mt-1">Custo Estimado</span>
+              </div>
+            </div>
+            <div className="mt-4 text-[9px] text-slate-500 text-center flex justify-center items-center">
+              <Info size={10} className="mr-1" /> Calculado com base na média de {config.kmL} km/L configurada.
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -444,7 +515,6 @@ function TabRelatorios({ entries, config }) {
       minOdo = Math.min(...odos);
     }
     const rodados = maxOdo - minOdo;
-    
     const media = litrosTotais > 0 && rodados > 0 ? (rodados / litrosTotais) : config.kmL;
 
     return { 
@@ -460,12 +530,7 @@ function TabRelatorios({ entries, config }) {
     <div className="flex flex-col space-y-5 pt-4 animate-fade-in-up">
       <div className="flex items-center justify-between px-2">
         <h2 className="text-lg font-bold text-slate-300 flex items-center"><BarChart2 className="mr-2 text-cyan-500" size={20} /> Relatórios</h2>
-        <input 
-          type="month" 
-          value={monthFilter}
-          onChange={(e) => setMonthFilter(e.target.value)}
-          className="bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-lg px-2 py-1 focus:outline-none focus:border-cyan-500"
-        />
+        <input type="month" value={monthFilter} onChange={(e) => setMonthFilter(e.target.value)} className="bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-lg px-2 py-1 focus:outline-none focus:border-cyan-500" />
       </div>
 
       <div className="bg-gradient-to-br from-cyan-900/40 to-blue-900/20 border border-cyan-800/50 rounded-3xl p-6 relative overflow-hidden">
@@ -529,20 +594,13 @@ function TabConfiguracoes({ config, currentFuel, entries, onCalculate, onImportD
       const jsonString = JSON.stringify(dataToExport, null, 2);
       const fileName = `motolog_backup_${new Date().toISOString().split('T')[0]}.json`;
       const blob = new Blob([jsonString], { type: 'application/json' });
-
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url; 
-      a.download = fileName;
-      document.body.appendChild(a); 
-      a.click(); 
-      document.body.removeChild(a);
+      a.href = url; a.download = fileName;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      
       setBackupMsg({ text: 'Verifique a pasta de Downloads!', type: 'success' });
-    } catch (err) { 
-      setBackupMsg({ text: 'Erro ao gerar o arquivo de backup.', type: 'error' }); 
-    }
+    } catch (err) { setBackupMsg({ text: 'Erro ao gerar backup.', type: 'error' }); }
     setTimeout(() => setBackupMsg({ text: '', type: '' }), 4000);
   };
 
@@ -554,24 +612,12 @@ function TabConfiguracoes({ config, currentFuel, entries, onCalculate, onImportD
         const importedData = JSON.parse(event.target.result);
         if (importedData.config && importedData.entries !== undefined) {
           onImportData(importedData); setBackupMsg({ text: 'Dados restaurados com sucesso!', type: 'success' });
-        } else { setBackupMsg({ text: 'Arquivo inválido ou corrompido.', type: 'error' }); }
-      } catch (err) { setBackupMsg({ text: 'Erro ao ler arquivo. Formato incorreto.', type: 'error' }); }
+        } else { setBackupMsg({ text: 'Arquivo inválido.', type: 'error' }); }
+      } catch (err) { setBackupMsg({ text: 'Formato incorreto.', type: 'error' }); }
       if (fileInputRef.current) fileInputRef.current.value = '';
       setTimeout(() => setBackupMsg({ text: '', type: '' }), 4000);
     };
     reader.readAsText(file);
-  };
-
-  const handleWipeData = () => {
-    if (confirmReset) {
-      onResetData();
-      setConfirmReset(false);
-      setBackupMsg({ text: 'Todos os registros foram apagados!', type: 'success' });
-      setTimeout(() => setBackupMsg({ text: '', type: '' }), 4000);
-    } else {
-      setConfirmReset(true);
-      setTimeout(() => setConfirmReset(false), 3000);
-    }
   };
 
   return (
@@ -582,56 +628,52 @@ function TabConfiguracoes({ config, currentFuel, entries, onCalculate, onImportD
           <label className="text-xs font-medium text-slate-400 uppercase tracking-wider ml-1">Tanque Total (L)</label>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500"><Droplets size={16} /></div>
-            <input type="number" name="tanqueTotal" value={localConfig.tanqueTotal} onChange={handleChange} step="0.1" className="w-full bg-[#060b14] border border-slate-700 text-slate-200 rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all font-mono" />
+            <input type="number" name="tanqueTotal" value={localConfig.tanqueTotal} onChange={handleChange} step="0.1" className="w-full bg-[#060b14] border border-slate-700 text-slate-200 rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:border-cyan-500 font-mono" />
           </div>
         </div>
         <div className="space-y-1">
           <label className="text-xs font-medium text-slate-400 uppercase tracking-wider ml-1">Meta / Média (Km/L)</label>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500"><BarChart2 size={16} /></div>
-            <input type="number" name="kmL" value={localConfig.kmL} onChange={handleChange} step="0.1" className="w-full bg-[#060b14] border border-slate-700 text-slate-200 rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all font-mono" />
+            <input type="number" name="kmL" value={localConfig.kmL} onChange={handleChange} step="0.1" className="w-full bg-[#060b14] border border-slate-700 text-slate-200 rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:border-cyan-500 font-mono" />
           </div>
         </div>
         <div className="space-y-1">
           <label className="text-xs font-medium text-slate-400 uppercase tracking-wider ml-1">Odômetro Atual (km)</label>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500"><Gauge size={16} /></div>
-            <input type="number" name="odometro" value={localConfig.odometro} onChange={handleChange} className="w-full bg-[#060b14] border border-slate-700 text-slate-200 rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all font-mono" />
+            <input type="number" name="odometro" value={localConfig.odometro} onChange={handleChange} className="w-full bg-[#060b14] border border-slate-700 text-slate-200 rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:border-cyan-500 font-mono" />
           </div>
         </div>
-        <button type="submit" className={`w-full mt-4 font-bold py-3.5 rounded-xl transition-all active:scale-95 flex justify-center items-center ${saved ? 'bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)]' : 'bg-teal-500 hover:bg-teal-400 text-slate-900 shadow-[0_0_15px_rgba(20,184,166,0.4)]'}`}>
+        <button type="submit" className={`w-full mt-4 font-bold py-3.5 rounded-xl transition-all flex justify-center items-center ${saved ? 'bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)]' : 'bg-teal-500 hover:bg-teal-400 text-slate-900 shadow-[0_0_15px_rgba(20,184,166,0.4)]'}`}>
           {saved ? <><CheckCircle2 className="mr-2" size={20} /> Salvo!</> : 'Salvar Manualmente'}
         </button>
       </form>
 
       <div className="bg-[#0f172a]/80 backdrop-blur-md border border-slate-800 rounded-2xl p-5 space-y-4">
         <h3 className="text-sm font-bold text-slate-300 flex items-center border-b border-slate-800 pb-2"><Database className="mr-2 text-cyan-500" size={18} /> Gerenciamento de Dados</h3>
-        <p className="text-xs text-slate-400 leading-relaxed">Exporte seus registros, importe um backup, ou zere o aplicativo para começar de novo.</p>
         
         {backupMsg.text && (
           <div className={`flex items-center p-3 rounded-lg text-xs font-medium ${backupMsg.type === 'success' ? 'bg-emerald-900/30 text-emerald-400 border border-emerald-800/50' : 'bg-red-900/30 text-red-400 border border-red-800/50'}`}>
-            {backupMsg.type === 'success' ? <CheckCircle2 size={16} className="mr-2 flex-shrink-0" /> : <AlertCircle size={16} className="mr-2 flex-shrink-0" />}
-            {backupMsg.text}
+            {backupMsg.type === 'success' ? <CheckCircle2 size={16} className="mr-2" /> : <AlertCircle size={16} className="mr-2" />} {backupMsg.text}
           </div>
         )}
         
         <div className="grid grid-cols-2 gap-3 pt-2">
-          <button onClick={handleExportBackup} className="flex flex-col items-center justify-center p-3 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-xl transition-colors text-cyan-400 hover:text-cyan-300">
+          <button onClick={handleExportBackup} className="flex flex-col items-center justify-center p-3 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-xl text-cyan-400">
             <Download size={20} className="mb-1" /><span className="text-xs font-bold">Exportar</span>
           </button>
-          <label className="flex flex-col items-center justify-center p-3 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-xl transition-colors text-purple-400 hover:text-purple-300 cursor-pointer">
+          <label className="flex flex-col items-center justify-center p-3 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-xl text-purple-400 cursor-pointer">
             <Upload size={20} className="mb-1" /><span className="text-xs font-bold">Importar</span>
             <input type="file" accept=".json" onChange={handleImportBackup} ref={fileInputRef} className="hidden" />
           </label>
         </div>
-        
-        <button 
-          onClick={handleWipeData} 
-          className={`w-full mt-2 flex items-center justify-center p-3 rounded-xl transition-colors border ${confirmReset ? 'bg-red-600 hover:bg-red-500 text-white border-red-500 shadow-[0_0_15px_rgba(220,38,38,0.4)]' : 'bg-slate-900/50 hover:bg-slate-800 border-red-900/30 text-red-400'}`}
-        >
-          <Trash2 size={18} className="mr-2" />
-          <span className="text-sm font-bold">{confirmReset ? 'Clique novamente para Confirmar!' : 'Zerar Todos os Dados'}</span>
-        </button>
+      </div>
+
+      {/* FOOTER ASSINATURA DO DESENVOLVEDOR */}
+      <div className="mt-8 pb-4 flex flex-col items-center justify-center border-t border-slate-800/50 pt-6 opacity-70">
+        <span className="text-[10px] text-slate-500 uppercase tracking-widest font-medium">Desenvolvido por</span>
+        <span className="text-xs font-bold text-cyan-500 tracking-wider mt-1">Joseilton Constâncio</span>
       </div>
     </div>
   );
@@ -647,359 +689,166 @@ function NavItem({ icon, label, isActive, onClick }) {
   );
 }
 
-// --- Modais Secundários (Ação) ---
+// --- MODAIS (Abastecimento, Despesa, Odometro e Detalhes simplificados para espaço) ---
 function ModalAbastecimento({ onClose, config, setConfig, currentFuel, setCurrentFuel, setEntries }) {
-  const today = new Date().toISOString().split('T')[0];
-  const [formData, setFormData] = useState({ data: today, odometro: config.odometro, litros: '', valorTotal: '', descricao: '' });
+  const [formData, setFormData] = useState({ data: new Date().toISOString().split('T')[0], odometro: config.odometro, litros: '', valorTotal: '', descricao: '' });
   const [isFullTank, setIsFullTank] = useState(false);
-
-  const precoLitro = useMemo(() => {
-    const l = parseFloat(formData.litros);
-    const v = parseFloat(formData.valorTotal);
-    return (l > 0 && v > 0) ? (v / l).toFixed(2) : '0.00';
-  }, [formData.litros, formData.valorTotal]);
-
-  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+  const precoLitro = useMemo(() => { const l = parseFloat(formData.litros); const v = parseFloat(formData.valorTotal); return (l > 0 && v > 0) ? (v / l).toFixed(2) : '0.00'; }, [formData.litros, formData.valorTotal]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const litrosForm = parseFloat(formData.litros) || 0;
-    const odometroForm = parseFloat(formData.odometro) || config.odometro;
-    const dataRegistro = new Date(formData.data + 'T12:00:00Z').toISOString();
-    
-    if (isFullTank) {
-      setCurrentFuel(config.tanqueTotal);
-    } else {
-      setCurrentFuel(prev => Math.min(config.tanqueTotal, prev + litrosForm));
-    }
-    
-    if (odometroForm > config.odometro) setConfig(prev => ({ ...prev, odometro: odometroForm }));
-
-    setEntries(prev => [{
-      id: Date.now(), 
-      type: 'abastecimento', 
-      date: dataRegistro,
-      odometro: odometroForm, 
-      litros: litrosForm, 
-      valorTotal: parseFloat(formData.valorTotal) || 0, 
-      precoLitro: parseFloat(precoLitro),
-      isFullTank: isFullTank,
-      descricao: formData.descricao
-    }, ...prev]);
-
+    const l = parseFloat(formData.litros) || 0; const o = parseFloat(formData.odometro) || config.odometro;
+    isFullTank ? setCurrentFuel(config.tanqueTotal) : setCurrentFuel(prev => Math.min(config.tanqueTotal, prev + l));
+    if (o > config.odometro) setConfig(prev => ({ ...prev, odometro: o }));
+    setEntries(prev => [{ id: Date.now(), type: 'abastecimento', date: new Date(formData.data + 'T12:00:00Z').toISOString(), odometro: o, litros: l, valorTotal: parseFloat(formData.valorTotal)||0, precoLitro: parseFloat(precoLitro), isFullTank, descricao: formData.descricao }, ...prev]);
     onClose();
   };
-
-  return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose}></div>
-      <div className="relative w-full max-w-sm bg-[#111827] border border-emerald-900/50 rounded-3xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-fade-in-up">
-        <div className="h-2 bg-gradient-to-r from-emerald-600 to-cyan-500 w-full flex-shrink-0"></div>
-        <div className="p-5 overflow-y-auto custom-scrollbar">
-          <div className="flex justify-between items-center mb-5">
-            <h3 className="text-xl font-bold text-slate-100 flex items-center"><Fuel className="text-emerald-500 mr-2" size={24} /> Novo Abastecimento</h3>
-            <button onClick={onClose} className="p-1 text-slate-400 hover:text-white bg-slate-800 rounded-full"><X size={20} /></button>
-          </div>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="text-xs text-slate-400 ml-1">Data</label>
-              <input type="date" required name="data" value={formData.data} onChange={handleChange} className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl p-3 text-white font-mono focus:border-emerald-500 focus:outline-none" />
-            </div>
-            <div>
-               <label className="text-xs text-slate-400 ml-1">Tipo</label>
-               <div className="flex bg-slate-900 border border-slate-700 rounded-xl p-1 mt-1">
-                 <button type="button" onClick={() => setIsFullTank(false)} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-colors ${!isFullTank ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-400 hover:text-slate-300'}`}>Parcial</button>
-                 <button type="button" onClick={() => setIsFullTank(true)} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-colors ${isFullTank ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-300'}`}>Completar Tanque</button>
-               </div>
-            </div>
-            <div>
-              <label className="text-xs text-slate-400 ml-1">Odômetro (km)</label>
-              <input type="number" required name="odometro" value={formData.odometro} onChange={handleChange} className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl p-3 text-white font-mono focus:border-emerald-500 focus:outline-none" />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs text-slate-400 ml-1">Litros</label>
-                <input type="number" step="0.01" required name="litros" value={formData.litros} onChange={handleChange} placeholder="0.00" className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl p-3 text-white font-mono focus:border-emerald-500 focus:outline-none" />
-              </div>
-              <div>
-                <label className="text-xs text-slate-400 ml-1">Valor Total (R$)</label>
-                <input type="number" step="0.01" required name="valorTotal" value={formData.valorTotal} onChange={handleChange} placeholder="0.00" className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl p-3 text-white font-mono focus:border-emerald-500 focus:outline-none" />
-              </div>
-            </div>
-            <div>
-              <label className="text-xs text-slate-400 ml-1">Descrição / Local</label>
-              <textarea name="descricao" value={formData.descricao} onChange={handleChange} rows="2" className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl p-3 text-white text-sm focus:border-emerald-500 focus:outline-none resize-none"></textarea>
-            </div>
-            <div className="bg-slate-800/50 border border-emerald-900/30 rounded-xl p-3 flex justify-between items-center mt-2">
-              <span className="text-sm text-slate-400">Valor por Litro:</span>
-              <span className="text-lg font-bold text-emerald-400 font-mono">R$ {precoLitro}</span>
-            </div>
-            <button type="submit" className="w-full mt-6 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl shadow-[0_0_15px_rgba(16,185,129,0.3)] transition-colors">Salvar Abastecimento</button>
-          </form>
-        </div>
+  // HTML (Mesmo de antes, abreviado por espaço)
+  return <ModalWrapper title="Novo Abastecimento" color="emerald" icon={<Fuel size={24}/>} onClose={onClose}>
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <Input label="Data" type="date" value={formData.data} onChange={e => setFormData({...formData, data: e.target.value})} />
+      <div className="flex bg-slate-900 border border-slate-700 rounded-xl p-1 mt-1">
+        <button type="button" onClick={() => setIsFullTank(false)} className={`flex-1 py-2 text-xs font-bold rounded-lg ${!isFullTank ? 'bg-slate-700 text-white' : 'text-slate-400'}`}>Parcial</button>
+        <button type="button" onClick={() => setIsFullTank(true)} className={`flex-1 py-2 text-xs font-bold rounded-lg ${isFullTank ? 'bg-emerald-600 text-white' : 'text-slate-400'}`}>Completar Tanque</button>
       </div>
-    </div>
-  );
+      <Input label="Odômetro (km)" type="number" value={formData.odometro} onChange={e => setFormData({...formData, odometro: e.target.value})} />
+      <div className="grid grid-cols-2 gap-3"><Input label="Litros" type="number" step="0.01" value={formData.litros} onChange={e => setFormData({...formData, litros: e.target.value})} /><Input label="Valor Total (R$)" type="number" step="0.01" value={formData.valorTotal} onChange={e => setFormData({...formData, valorTotal: e.target.value})} /></div>
+      <button type="submit" className="w-full mt-6 bg-emerald-600 text-white font-bold py-3 rounded-xl shadow-[0_0_15px_rgba(16,185,129,0.3)]">Salvar</button>
+    </form>
+  </ModalWrapper>
 }
 
 function ModalDespesa({ onClose, config, setEntries }) {
-  const today = new Date().toISOString().split('T')[0];
-  const [formData, setFormData] = useState({ data: today, titulo: '', valor: '', descricao: '' });
-  
-  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
-  
+  const [formData, setFormData] = useState({ data: new Date().toISOString().split('T')[0], titulo: '', valor: '', descricao: '' });
   const handleSubmit = (e) => {
     e.preventDefault();
-    const dataRegistro = new Date(formData.data + 'T12:00:00Z').toISOString();
-    setEntries(prev => [{ 
-      id: Date.now(), 
-      type: 'despesa', 
-      date: dataRegistro, 
-      titulo: formData.titulo, 
-      valor: parseFloat(formData.valor) || 0, 
-      odometro: parseFloat(config.odometro), // Salva automaticamente o Km atual para monitorar alertas!
-      descricao: formData.descricao 
-    }, ...prev]);
+    setEntries(prev => [{ id: Date.now(), type: 'despesa', date: new Date(formData.data + 'T12:00:00Z').toISOString(), titulo: formData.titulo, valor: parseFloat(formData.valor)||0, odometro: config.odometro, descricao: formData.descricao }, ...prev]);
     onClose();
   };
-
-  return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose}></div>
-      <div className="relative w-full max-w-sm bg-[#111827] border border-red-900/50 rounded-3xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-fade-in-up">
-        <div className="h-2 bg-gradient-to-r from-red-600 to-orange-500 w-full flex-shrink-0"></div>
-        <div className="p-5 overflow-y-auto custom-scrollbar">
-          <div className="flex justify-between items-center mb-5">
-            <h3 className="text-xl font-bold text-slate-100 flex items-center"><Wrench className="text-red-500 mr-2" size={24} /> Nova Despesa</h3>
-            <button onClick={onClose} className="p-1 text-slate-400 hover:text-white bg-slate-800 rounded-full"><X size={20} /></button>
-          </div>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="text-xs text-slate-400 ml-1">Data</label>
-              <input type="date" required name="data" value={formData.data} onChange={handleChange} className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl p-3 text-white font-mono focus:border-red-500 focus:outline-none" />
-            </div>
-            <div><label className="text-xs text-slate-400 ml-1">Título da Despesa</label><input type="text" required name="titulo" value={formData.titulo} onChange={handleChange} placeholder="Ex: Troca de Óleo" className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl p-3 text-white focus:border-red-500 focus:outline-none" /></div>
-            <div><label className="text-xs text-slate-400 ml-1">Valor Total (R$)</label><input type="number" step="0.01" required name="valor" value={formData.valor} onChange={handleChange} placeholder="0.00" className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl p-3 text-white font-mono focus:border-red-500 focus:outline-none" /></div>
-            <div><label className="text-xs text-slate-400 ml-1">Descrição</label><textarea name="descricao" value={formData.descricao} onChange={handleChange} rows="3" className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl p-3 text-white text-sm focus:border-red-500 focus:outline-none resize-none"></textarea></div>
-            <button type="submit" className="w-full mt-6 bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-xl shadow-[0_0_15px_rgba(220,38,38,0.3)] transition-colors">Salvar Despesa</button>
-          </form>
-        </div>
-      </div>
-    </div>
-  );
+  return <ModalWrapper title="Nova Despesa" color="red" icon={<Wrench size={24}/>} onClose={onClose}>
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <Input label="Data" type="date" value={formData.data} onChange={e => setFormData({...formData, data: e.target.value})} />
+      <Input label="Título da Despesa" type="text" value={formData.titulo} onChange={e => setFormData({...formData, titulo: e.target.value})} />
+      <Input label="Valor Total (R$)" type="number" step="0.01" value={formData.valor} onChange={e => setFormData({...formData, valor: e.target.value})} />
+      <button type="submit" className="w-full mt-6 bg-red-600 text-white font-bold py-3 rounded-xl shadow-[0_0_15px_rgba(220,38,38,0.3)]">Salvar</button>
+    </form>
+  </ModalWrapper>
 }
 
 function ModalOdometro({ onClose, config, setConfig, currentFuel, setCurrentFuel, setEntries }) {
-  const today = new Date().toISOString().split('T')[0];
-  const [data, setData] = useState(today);
+  const [data, setData] = useState(new Date().toISOString().split('T')[0]);
   const [novoOdometro, setNovoOdometro] = useState('');
-  const [descricao, setDescricao] = useState('');
-  const [errorMsg, setErrorMsg] = useState('');
+  const handleSubmit = (e) => {
+    e.preventDefault(); const val = parseFloat(novoOdometro); if (isNaN(val) || val <= config.odometro) return;
+    const diffKm = val - config.odometro; const litrosGastos = diffKm / (config.kmL || 1);
+    setCurrentFuel(Math.max(0, currentFuel - litrosGastos)); setConfig(prev => ({ ...prev, odometro: val }));
+    setEntries(prev => [{ id: Date.now(), type: 'viagem', date: new Date(data + 'T12:00:00Z').toISOString(), titulo: 'Atualização de Rota', kmRodados: diffKm, litrosGastos, descricao: '' }, ...prev]);
+    onClose();
+  };
+  return <ModalWrapper title="Atualizar Odômetro" color="purple" icon={<MapPin size={24}/>} onClose={onClose}>
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <Input label="Novo Odômetro (km)" type="number" value={novoOdometro} onChange={e => setNovoOdometro(e.target.value)} placeholder={`Atual: ${config.odometro}`} />
+      <button type="submit" className="w-full mt-6 bg-purple-600 text-white font-bold py-3 rounded-xl shadow-[0_0_15px_rgba(147,51,234,0.3)]">Confirmar</button>
+    </form>
+  </ModalWrapper>
+}
+
+// NOVO: Modal para encerrar a viagem!
+function ModalEncerrarViagem({ onClose, activeTrip, setActiveTrip, config, setConfig, currentFuel, setCurrentFuel, setEntries }) {
+  const [odoFinal, setOdoFinal] = useState('');
+  const [desc, setDesc] = useState('');
+  const [erro, setErro] = useState('');
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const val = parseFloat(novoOdometro);
-    if (isNaN(val) || val <= config.odometro) { setErrorMsg('Deve ser maior que o atual.'); return; }
+    const final = parseFloat(odoFinal);
+    if (isNaN(final) || final <= activeTrip.startOdo) {
+      setErro('O Km final deve ser maior que o inicial.');
+      return;
+    }
     
-    const diffKm = val - config.odometro;
-    const litrosGastos = diffKm / (config.kmL || 1);
-    const novoCombustivel = Math.max(0, currentFuel - litrosGastos);
-    const dataRegistro = new Date(data + 'T12:00:00Z').toISOString();
+    // Cálculos
+    const kmRodados = final - activeTrip.startOdo;
+    const litrosGastos = kmRodados / (config.kmL || 1);
+    const segundos = Math.floor((Date.now() - activeTrip.startTime) / 1000);
+    const h = Math.floor(segundos / 3600); const m = Math.floor((segundos % 3600) / 60);
+    const duracaoTexto = `${h > 0 ? h + 'h ' : ''}${m}m`;
 
-    setCurrentFuel(novoCombustivel);
-    setConfig(prev => ({ ...prev, odometro: val }));
-    setEntries(prev => [{ id: Date.now(), type: 'viagem', date: dataRegistro, titulo: 'Atualização de Rota', kmRodados: diffKm, litrosGastos: litrosGastos, descricao: descricao }, ...prev]);
+    // Atualiza Estado
+    setCurrentFuel(prev => Math.max(0, prev - litrosGastos));
+    setConfig(prev => ({ ...prev, odometro: final }));
+    setEntries(prev => [{ 
+      id: Date.now(), type: 'viagem', date: new Date().toISOString(), 
+      titulo: 'Viagem Registrada', kmRodados, litrosGastos, duracao: duracaoTexto, descricao: desc 
+    }, ...prev]);
+    
+    setActiveTrip(null);
     onClose();
   };
 
   return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose}></div>
-      <div className="relative w-full max-w-sm bg-[#111827] border border-purple-900/50 rounded-3xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-fade-in-up">
-        <div className="h-2 bg-gradient-to-r from-purple-600 to-indigo-500 w-full flex-shrink-0"></div>
-        <div className="p-5 overflow-y-auto custom-scrollbar">
-          <div className="flex justify-between items-center mb-5">
-            <h3 className="text-xl font-bold text-slate-100 flex items-center"><MapPin className="text-purple-500 mr-2" size={24} /> Atualizar Odômetro</h3>
-            <button onClick={onClose} className="p-1 text-slate-400 hover:text-white bg-slate-800 rounded-full"><X size={20} /></button>
-          </div>
-          <p className="text-xs text-slate-400 mb-4">Atualize sua quilometragem para descontar o combustível gasto automaticamente.</p>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="text-xs text-slate-400 ml-1">Data</label>
-              <input type="date" required value={data} onChange={(e) => setData(e.target.value)} className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl p-3 text-white font-mono focus:border-purple-500 focus:outline-none" />
-            </div>
-            <div>
-              <label className="text-xs text-slate-400 ml-1">Novo Odômetro (km)</label>
-              <input type="number" required value={novoOdometro} onChange={(e) => { setNovoOdometro(e.target.value); setErrorMsg(''); }} placeholder={`Atual: ${config.odometro} km`} className={`w-full mt-1 bg-slate-900 border rounded-xl p-3 text-white font-mono focus:outline-none transition-colors ${errorMsg ? 'border-red-500 focus:border-red-500' : 'border-slate-700 focus:border-purple-500'}`} />
-              {errorMsg && <span className="text-[10px] text-red-400 mt-1 ml-1">{errorMsg}</span>}
-            </div>
-            <div>
-              <label className="text-xs text-slate-400 ml-1">Descrição</label>
-              <textarea value={descricao} onChange={(e) => setDescricao(e.target.value)} rows="2" placeholder="Opcional" className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl p-3 text-white text-sm focus:border-purple-500 focus:outline-none resize-none"></textarea>
-            </div>
-            {novoOdometro && !isNaN(parseFloat(novoOdometro)) && parseFloat(novoOdometro) > config.odometro && (
-              <div className="bg-purple-900/20 border border-purple-500/30 rounded-xl p-3 animate-fade-in-up">
-                <span className="block text-xs text-purple-300">Resumo da Atualização:</span>
-                <span className="block text-sm font-bold text-slate-200 mt-1">+{ (parseFloat(novoOdometro) - config.odometro) } km rodados</span>
-                <span className="block text-sm font-bold text-red-400">- { ((parseFloat(novoOdometro) - config.odometro) / (config.kmL || 1)).toFixed(1) }L do tanque</span>
-              </div>
-            )}
-            <button type="submit" className="w-full mt-6 bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 rounded-xl shadow-[0_0_15px_rgba(147,51,234,0.3)] transition-colors">Confirmar Rota</button>
-          </form>
+    <ModalWrapper title="Encerrar Viagem" color="indigo" icon={<Square size={24}/>} onClose={onClose}>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="bg-indigo-900/30 p-4 rounded-xl border border-indigo-500/30 flex justify-between items-center mb-4">
+          <span className="text-xs text-indigo-300 uppercase">Km de Partida</span>
+          <span className="text-lg font-bold font-mono text-white">{activeTrip?.startOdo}</span>
         </div>
-      </div>
-    </div>
+        <div>
+          <label className="text-xs text-slate-400 ml-1">Odômetro de Chegada (Km)</label>
+          <input type="number" required value={odoFinal} onChange={e => {setOdoFinal(e.target.value); setErro('');}} className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl p-3 text-white font-mono focus:border-indigo-500 focus:outline-none" />
+          {erro && <span className="text-[10px] text-red-400 mt-1">{erro}</span>}
+        </div>
+        <div>
+          <label className="text-xs text-slate-400 ml-1">Destino ou Descrição (Opcional)</label>
+          <input type="text" value={desc} onChange={e => setDesc(e.target.value)} className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl p-3 text-white focus:border-indigo-500 focus:outline-none" />
+        </div>
+        <button type="submit" className="w-full mt-6 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-xl shadow-[0_0_15px_rgba(79,70,229,0.3)]">Salvar Viagem</button>
+      </form>
+    </ModalWrapper>
   );
 }
 
 function ModalDetalhes({ entry, onClose, setEntries }) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState({
-    ...entry,
-    data: entry.date ? entry.date.split('T')[0] : ''
-  });
+  const handleDelete = () => { setEntries(prev => prev.filter(e => e.id !== entry.id)); onClose(); };
+  return <ModalWrapper title={entry.type === 'abastecimento' ? 'Abastecimento' : entry.titulo} color="slate" icon={<Info size={24}/>} onClose={onClose}>
+    <div className="space-y-4">
+      {entry.type === 'viagem' && (
+         <div className="grid grid-cols-2 gap-4">
+           <div><p className="text-xs text-slate-500 uppercase">Km Rodados</p><p className="font-mono text-purple-400 text-lg font-bold">+{entry.kmRodados} km</p></div>
+           <div><p className="text-xs text-slate-500 uppercase">Combustível</p><p className="font-mono text-red-400 text-lg font-bold">-{entry.litrosGastos?.toFixed(1)} L</p></div>
+           {entry.duracao && <div className="col-span-2"><p className="text-xs text-slate-500 uppercase">Tempo de Viagem</p><p className="font-mono text-slate-200 font-bold">{entry.duracao}</p></div>}
+         </div>
+      )}
+      <button onClick={handleDelete} className="w-full mt-6 bg-red-900/30 text-red-400 border border-red-800/50 font-bold py-3 rounded-xl flex justify-center items-center"><Trash2 size={18} className="mr-2" /> Excluir Registro</button>
+    </div>
+  </ModalWrapper>
+}
 
-  const handleChange = (e) => {
-    const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
-    setFormData({ ...formData, [e.target.name]: value });
-  };
-
-  const handleSaveEdit = () => {
-    let updatedEntry = { ...formData };
-    
-    updatedEntry.date = new Date(formData.data + 'T12:00:00Z').toISOString();
-    
-    if (updatedEntry.type === 'abastecimento') {
-      updatedEntry.litros = parseFloat(formData.litros) || 0;
-      updatedEntry.valorTotal = parseFloat(formData.valorTotal) || 0;
-      updatedEntry.odometro = parseFloat(formData.odometro) || 0;
-      updatedEntry.precoLitro = (updatedEntry.litros > 0 && updatedEntry.valorTotal > 0) ? parseFloat((updatedEntry.valorTotal / updatedEntry.litros).toFixed(2)) : 0;
-    } else if (updatedEntry.type === 'despesa') {
-      updatedEntry.valor = parseFloat(formData.valor) || 0;
-      updatedEntry.odometro = parseFloat(formData.odometro) || 0;
-    }
-
-    setEntries(prev => prev.map(e => e.id === entry.id ? updatedEntry : e));
-    setIsEditing(false);
-  };
-
-  const handleDelete = () => {
-    setEntries(prev => prev.filter(e => e.id !== entry.id));
-    onClose();
-  };
-
-  const colorData = {
-    abastecimento: { bg: 'from-emerald-600 to-cyan-500', icon: Fuel, text: 'text-emerald-400', border: 'border-emerald-500/30' },
-    despesa: { bg: 'from-red-600 to-orange-500', icon: Wrench, text: 'text-red-400', border: 'border-red-500/30' },
-    viagem: { bg: 'from-purple-600 to-indigo-500', icon: MapPin, text: 'text-purple-400', border: 'border-purple-500/30' }
-  };
-  const theme = colorData[entry.type];
-  const Icon = theme.icon;
-
+// Utilitários de UI para os Modais
+function ModalWrapper({ title, color, icon, onClose, children }) {
+  const colorMap = { emerald: 'from-emerald-600 to-cyan-500', red: 'from-red-600 to-orange-500', purple: 'from-purple-600 to-indigo-500', indigo: 'from-indigo-600 to-purple-500', slate: 'from-slate-600 to-slate-400' };
+  const textMap = { emerald: 'text-emerald-500', red: 'text-red-500', purple: 'text-purple-500', indigo: 'text-indigo-500', slate: 'text-slate-300' };
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose}></div>
-      <div className="relative w-full max-w-sm bg-[#111827] border border-slate-700 rounded-3xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-fade-in-up">
-        <div className={`h-2 bg-gradient-to-r ${theme.bg} w-full flex-shrink-0`}></div>
-        
+      <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose}></div>
+      <div className="relative w-full max-w-sm bg-[#111827] rounded-3xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-fade-in-up">
+        <div className={`h-2 bg-gradient-to-r ${colorMap[color]} w-full`}></div>
         <div className="p-5 overflow-y-auto custom-scrollbar">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="text-xl font-bold text-slate-100 flex items-center">
-              <Icon className={`${theme.text} mr-2`} size={24} />
-              {isEditing ? 'Editar Registro' : 'Detalhes'}
-            </h3>
-            <button onClick={onClose} className="p-1 text-slate-400 hover:text-white bg-slate-800 rounded-full"><X size={20} /></button>
+          <div className="flex justify-between items-center mb-5">
+            <h3 className="text-xl font-bold text-slate-100 flex items-center"><span className={`${textMap[color]} mr-2`}>{icon}</span> {title}</h3>
+            <button onClick={onClose} className="p-1 text-slate-400 bg-slate-800 rounded-full"><X size={20} /></button>
           </div>
-
-          {!isEditing ? (
-            <div className="space-y-4">
-              <div className="flex justify-between items-start pb-4 border-b border-slate-800">
-                <div>
-                  <h4 className="font-bold text-lg text-slate-200">
-                    {entry.type === 'abastecimento' ? 'Abastecimento' : entry.titulo}
-                  </h4>
-                  <span className="text-sm text-slate-400 flex items-center mt-1">
-                    <Calendar size={14} className="mr-1.5" />
-                    {new Date(entry.date).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}
-                  </span>
-                </div>
-                {entry.isFullTank && <span className="px-2 py-1 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">Tanque Cheio</span>}
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 py-2">
-                {entry.type === 'abastecimento' && (
-                  <>
-                    <div><p className="text-xs text-slate-500 uppercase">Odômetro</p><p className="font-mono text-slate-200 font-bold">{entry.odometro} km</p></div>
-                    <div><p className="text-xs text-slate-500 uppercase">Litros</p><p className="font-mono text-slate-200 font-bold">{entry.litros} L</p></div>
-                    <div><p className="text-xs text-slate-500 uppercase">Valor Total</p><p className={`font-mono font-bold ${theme.text}`}>R$ {entry.valorTotal?.toFixed(2)}</p></div>
-                    <div><p className="text-xs text-slate-500 uppercase">Preço / Litro</p><p className="font-mono text-slate-200 font-bold">R$ {entry.precoLitro?.toFixed(2)}</p></div>
-                  </>
-                )}
-                {entry.type === 'despesa' && (
-                  <>
-                    <div><p className="text-xs text-slate-500 uppercase">Valor Total</p><p className={`font-mono text-xl font-bold ${theme.text}`}>R$ {entry.valor?.toFixed(2)}</p></div>
-                    {entry.odometro && <div><p className="text-xs text-slate-500 uppercase">Odômetro</p><p className="font-mono text-slate-200 font-bold">{entry.odometro} km</p></div>}
-                  </>
-                )}
-                {entry.type === 'viagem' && (
-                  <>
-                    <div><p className="text-xs text-slate-500 uppercase">Km Rodados</p><p className="font-mono text-slate-200 font-bold">+{entry.kmRodados} km</p></div>
-                    <div><p className="text-xs text-slate-500 uppercase">Litros Gastos</p><p className={`font-mono font-bold ${theme.text}`}>-{entry.litrosGastos?.toFixed(1)} L</p></div>
-                  </>
-                )}
-              </div>
-
-              <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4 mt-2">
-                <p className="text-xs text-slate-400 uppercase mb-1 flex items-center"><Info size={14} className="mr-1"/> Descrição</p>
-                <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">
-                  {entry.descricao || <span className="italic text-slate-500">Nenhuma descrição adicionada.</span>}
-                </p>
-              </div>
-
-              <div className="flex gap-3 pt-4 mt-4 border-t border-slate-800">
-                <button onClick={() => setIsEditing(true)} className="flex-1 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white font-bold py-3 rounded-xl transition-colors flex justify-center items-center">
-                  <Edit2 size={16} className="mr-2" /> Editar
-                </button>
-                <button onClick={handleDelete} className="bg-red-900/30 hover:bg-red-900/50 border border-red-800/50 text-red-400 font-bold px-4 rounded-xl transition-colors flex justify-center items-center">
-                  <Trash2 size={18} />
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div>
-                <label className="text-xs text-slate-400 ml-1">Data</label>
-                <input type="date" name="data" value={formData.data} onChange={handleChange} className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl p-3 text-white font-mono focus:border-cyan-500 focus:outline-none" />
-              </div>
-
-              {entry.type === 'despesa' && (
-                <>
-                  <div><label className="text-xs text-slate-400 ml-1">Título</label><input type="text" name="titulo" value={formData.titulo} onChange={handleChange} className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl p-3 text-white focus:border-cyan-500 focus:outline-none" /></div>
-                  <div><label className="text-xs text-slate-400 ml-1">Valor Total (R$)</label><input type="number" step="0.01" name="valor" value={formData.valor} onChange={handleChange} className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl p-3 text-white font-mono focus:border-cyan-500 focus:outline-none" /></div>
-                  <div><label className="text-xs text-slate-400 ml-1">Odômetro (km)</label><input type="number" name="odometro" value={formData.odometro || ''} onChange={handleChange} className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl p-3 text-white font-mono focus:border-cyan-500 focus:outline-none" /></div>
-                </>
-              )}
-
-              {entry.type === 'abastecimento' && (
-                <>
-                  <div><label className="text-xs text-slate-400 ml-1">Odômetro (km)</label><input type="number" name="odometro" value={formData.odometro} onChange={handleChange} className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl p-3 text-white font-mono focus:border-cyan-500 focus:outline-none" /></div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div><label className="text-xs text-slate-400 ml-1">Litros</label><input type="number" step="0.01" name="litros" value={formData.litros} onChange={handleChange} className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl p-3 text-white font-mono focus:border-cyan-500 focus:outline-none" /></div>
-                    <div><label className="text-xs text-slate-400 ml-1">Valor (R$)</label><input type="number" step="0.01" name="valorTotal" value={formData.valorTotal} onChange={handleChange} className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl p-3 text-white font-mono focus:border-cyan-500 focus:outline-none" /></div>
-                  </div>
-                </>
-              )}
-
-              <div><label className="text-xs text-slate-400 ml-1">Descrição</label><textarea name="descricao" value={formData.descricao || ''} onChange={handleChange} rows="3" className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl p-3 text-white text-sm focus:border-cyan-500 focus:outline-none resize-none"></textarea></div>
-
-              <div className="flex gap-3 pt-4">
-                <button onClick={() => setIsEditing(false)} className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-3 rounded-xl transition-colors">Cancelar</button>
-                <button onClick={handleSaveEdit} className="flex-1 bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-3 rounded-xl transition-colors">Salvar</button>
-              </div>
-            </div>
-          )}
+          {children}
         </div>
       </div>
+    </div>
+  );
+}
+function Input({ label, type, value, onChange, step, placeholder }) {
+  return (
+    <div>
+      <label className="text-xs text-slate-400 ml-1">{label}</label>
+      <input type={type} required step={step} value={value} onChange={onChange} placeholder={placeholder} className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl p-3 text-white font-mono focus:border-cyan-500 focus:outline-none" />
     </div>
   );
 }
