@@ -11,18 +11,19 @@ export default function App() {
   const [activeModal, setActiveModal] = useState(null);
   const [selectedEntry, setSelectedEntry] = useState(null);
 
+  // DADOS ZERADOS POR PADRÃO
   const [config, setConfig] = useState(() => {
     try {
       const saved = localStorage.getItem('motolog_config');
-      return saved ? JSON.parse(saved) : { tanqueTotal: 15, kmL: 25, odometro: 12532 };
-    } catch (e) { return { tanqueTotal: 15, kmL: 25, odometro: 12532 }; }
+      return saved ? JSON.parse(saved) : { tanqueTotal: 0, kmL: 0, odometro: 0 };
+    } catch (e) { return { tanqueTotal: 0, kmL: 0, odometro: 0 }; }
   });
 
   const [currentFuel, setCurrentFuel] = useState(() => {
     try {
       const saved = localStorage.getItem('motolog_fuel');
-      return saved ? JSON.parse(saved) : 11.1;
-    } catch (e) { return 11.1; }
+      return saved ? JSON.parse(saved) : 0;
+    } catch (e) { return 0; }
   }); 
 
   const [entries, setEntries] = useState(() => {
@@ -153,7 +154,7 @@ export default function App() {
 // ==========================================
 
 function TabPainel({ currentFuel, tanqueTotal, config, entries }) {
-  const percent = Math.max(0, Math.min(100, (currentFuel / tanqueTotal) * 100));
+  const percent = tanqueTotal > 0 ? Math.max(0, Math.min(100, (currentFuel / tanqueTotal) * 100)) : 0;
   const rotation = -90 + (percent * 1.8);
 
   const ultimaTrocaOleo = entries.find(e => e.type === 'despesa' && (e.titulo?.toLowerCase().includes('óleo') || e.titulo?.toLowerCase().includes('oleo')));
@@ -223,12 +224,12 @@ function TabPainel({ currentFuel, tanqueTotal, config, entries }) {
         <div className="bg-white/5 border border-white/10 rounded-2xl p-3 flex flex-col items-center justify-center backdrop-blur-sm">
           <Droplets className="text-emerald-400 mb-1" size={20} />
           <span className="text-[10px] text-slate-400 uppercase tracking-wider mb-0.5">Tanque Info</span>
-          <span className="text-base font-bold text-slate-200">{((currentFuel/tanqueTotal)*100).toFixed(0)}% Cheio</span>
+          <span className="text-base font-bold text-slate-200">{tanqueTotal > 0 ? ((currentFuel/tanqueTotal)*100).toFixed(0) : 0}% Cheio</span>
         </div>
         <div className="bg-white/5 border border-white/10 rounded-2xl p-3 flex flex-col items-center justify-center backdrop-blur-sm">
           <Gauge className="text-purple-400 mb-1" size={20} />
           <span className="text-[10px] text-slate-400 uppercase tracking-wider mb-0.5">Autonomia Est.</span>
-          <span className="text-base font-bold text-slate-200">~{(currentFuel * config.kmL).toFixed(0)} km</span>
+          <span className="text-base font-bold text-slate-200">~{(currentFuel * (config.kmL || 0)).toFixed(0)} km</span>
         </div>
       </div>
 
@@ -336,12 +337,55 @@ function TabLog({ entries, onSelectEntry }) {
   );
 }
 
+// === NOVA TELA DE RELATÓRIOS FUNCIONAL ===
 function TabRelatorios({ entries }) {
+  const totalAbastecimento = entries.filter(e => e.type === 'abastecimento').reduce((acc, curr) => acc + (curr.valorTotal || 0), 0);
+  const totalDespesa = entries.filter(e => e.type === 'despesa').reduce((acc, curr) => acc + (curr.valor || 0), 0);
+  const totalViagemKm = entries.filter(e => e.type === 'viagem').reduce((acc, curr) => acc + (curr.kmRodados || 0), 0);
+  const totalGasto = totalAbastecimento + totalDespesa;
+
   return (
-    <div className="flex flex-col items-center justify-center pt-20 animate-fade-in-up">
-      <BarChart2 size={48} className="text-cyan-500 mb-4 opacity-50" />
-      <h2 className="text-xl font-bold text-slate-300">Em Desenvolvimento</h2>
-      <p className="text-slate-500 text-center mt-2 px-6">Em breve você terá gráficos detalhados dos seus gastos aqui.</p>
+    <div className="flex flex-col space-y-6 pt-4 animate-fade-in-up px-1">
+      <h2 className="text-lg font-bold text-slate-300 flex items-center">
+        <BarChart2 className="mr-2 text-cyan-500" size={20} /> Relatórios Financeiros
+      </h2>
+      
+      <div className="grid grid-cols-2 gap-4">
+        <div className="bg-[#0f172a]/80 backdrop-blur-md border border-slate-800 rounded-2xl p-4 flex flex-col items-center justify-center shadow-lg">
+          <span className="text-[10px] text-slate-400 uppercase tracking-wider mb-1">Total Gasto</span>
+          <span className="text-xl font-bold text-slate-200">R$ {totalGasto.toFixed(2)}</span>
+        </div>
+        <div className="bg-[#0f172a]/80 backdrop-blur-md border border-slate-800 rounded-2xl p-4 flex flex-col items-center justify-center shadow-lg">
+          <span className="text-[10px] text-slate-400 uppercase tracking-wider mb-1">Km em Viagens</span>
+          <span className="text-xl font-bold text-purple-400">{totalViagemKm.toFixed(1)} km</span>
+        </div>
+      </div>
+
+      <div className="bg-[#0f172a]/80 backdrop-blur-md border border-slate-800 rounded-2xl p-5 shadow-lg space-y-5">
+        <h3 className="text-sm font-bold text-slate-300 border-b border-slate-800 pb-2">Distribuição de Gastos</h3>
+        
+        <div className="space-y-4 pt-2">
+          <div>
+            <div className="flex justify-between text-xs mb-1">
+              <span className="text-slate-300 flex items-center"><Fuel size={14} className="text-emerald-400 mr-2"/> Abastecimentos</span>
+              <span className="font-mono text-emerald-400 font-bold">R$ {totalAbastecimento.toFixed(2)}</span>
+            </div>
+            <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-slate-800">
+              <div className="bg-emerald-500 h-full rounded-full" style={{ width: totalGasto > 0 ? `${(totalAbastecimento/totalGasto)*100}%` : '0%' }}></div>
+            </div>
+          </div>
+
+          <div>
+            <div className="flex justify-between text-xs mb-1">
+              <span className="text-slate-300 flex items-center"><Wrench size={14} className="text-red-400 mr-2"/> Manutenções</span>
+              <span className="font-mono text-red-400 font-bold">R$ {totalDespesa.toFixed(2)}</span>
+            </div>
+            <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-slate-800">
+              <div className="bg-red-500 h-full rounded-full" style={{ width: totalGasto > 0 ? `${(totalDespesa/totalGasto)*100}%` : '0%' }}></div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -434,7 +478,7 @@ function TabViagem({ config, entries, activeTrip, setActiveTrip, onStopTrip, cur
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}`;
   };
 
-  const calcLitros = (parseFloat(distanciaPlan) || 0) / config.kmL;
+  const calcLitros = config.kmL > 0 ? (parseFloat(distanciaPlan) || 0) / config.kmL : 0;
   const calcCusto = calcLitros * (parseFloat(precoPlan) || 0);
 
   if (activeTrip) {
@@ -573,6 +617,12 @@ function TabConfiguracoes({ config, currentFuel, entries, onCalculate, onImportD
           <span className="text-sm font-bold">{confirmReset ? 'Clique novamente para Confirmar!' : 'Zerar Todos os Dados'}</span>
         </button>
       </div>
+
+      {/* RODAPÉ DO DESENVOLVEDOR REINSERIDO AQUI */}
+      <div className="mt-8 pb-4 flex flex-col items-center justify-center border-t border-slate-800/50 pt-6 opacity-70">
+        <span className="text-[10px] text-slate-500 uppercase tracking-widest font-medium">Desenvolvido por</span>
+        <span className="text-xs font-bold text-cyan-500 tracking-wider mt-1">Joseilton Constâncio</span>
+      </div>
     </div>
   );
 }
@@ -625,7 +675,7 @@ function ModalDespesa({ onClose, config, setEntries }) {
 
 function ModalOdometro({ onClose, config, setConfig, currentFuel, setCurrentFuel, setEntries }) {
   const [data, setData] = useState(new Date().toISOString().split('T')[0]); const [novoOdometro, setNovoOdometro] = useState('');
-  const handleSubmit = (e) => { e.preventDefault(); const val = parseFloat(novoOdometro); if (isNaN(val) || val <= config.odometro) return; const diffKm = val - config.odometro; const litrosGastos = diffKm / (config.kmL || 1); setCurrentFuel(Math.max(0, currentFuel - litrosGastos)); setConfig(prev => ({ ...prev, odometro: val })); setEntries(prev => [{ id: Date.now(), type: 'viagem', date: new Date(data + 'T12:00:00Z').toISOString(), titulo: 'Atualização de Rota', kmRodados: diffKm, litrosGastos, descricao: '' }, ...prev]); onClose(); };
+  const handleSubmit = (e) => { e.preventDefault(); const val = parseFloat(novoOdometro); if (isNaN(val) || val <= config.odometro) return; const diffKm = val - config.odometro; const litrosGastos = config.kmL > 0 ? diffKm / config.kmL : 0; setCurrentFuel(Math.max(0, currentFuel - litrosGastos)); setConfig(prev => ({ ...prev, odometro: val })); setEntries(prev => [{ id: Date.now(), type: 'viagem', date: new Date(data + 'T12:00:00Z').toISOString(), titulo: 'Atualização de Rota', kmRodados: diffKm, litrosGastos, descricao: '' }, ...prev]); onClose(); };
   return <ModalWrapper title="Atualizar Odômetro" color="purple" icon={<MapPin size={24}/>} onClose={onClose}>
     <form onSubmit={handleSubmit} className="space-y-4">
       <Input label="Novo Odômetro (km)" type="number" value={novoOdometro} onChange={e => setNovoOdometro(e.target.value)} placeholder={`Atual: ${config.odometro}`} />
@@ -643,7 +693,7 @@ function ModalEncerrarViagem({ onClose, activeTrip, setActiveTrip, config, setCo
   const handleSubmit = (e) => {
     e.preventDefault(); const final = parseFloat(odoFinal);
     if (isNaN(final) || final <= activeTrip.startOdo) { setErro('O Km final deve ser maior que o inicial.'); return; }
-    const kmRodados = final - activeTrip.startOdo; const litrosGastos = kmRodados / (config.kmL || 1);
+    const kmRodados = final - activeTrip.startOdo; const litrosGastos = config.kmL > 0 ? kmRodados / config.kmL : 0;
     const segundos = Math.floor((Date.now() - activeTrip.startTime) / 1000);
     const h = Math.floor(segundos / 3600); const m = Math.floor((segundos % 3600) / 60); const duracaoTexto = `${h > 0 ? h + 'h ' : ''}${m}m`;
     setCurrentFuel(prev => Math.max(0, prev - litrosGastos)); setConfig(prev => ({ ...prev, odometro: final }));
