@@ -3,17 +3,15 @@ import {
   LayoutDashboard, List, BarChart2, Settings, Plus, X, Fuel, Wrench, 
   Gauge, Droplets, Calendar, Banknote, MapPin, CheckCircle2, Download, 
   Upload, Database, AlertCircle, Trash2, Wallet, Edit2, Info,
-  Map, Play, Square, Route, Timer, Filter, Navigation
+  Map, Play, Square, Route, Timer, Filter, Navigation, Search, Loader2
 } from 'lucide-react';
 
 export default function App() {
-  // --- Estados Principais ---
   const [activeTab, setActiveTab] = useState('PAINEL');
   const [fabMenuOpen, setFabMenuOpen] = useState(false);
   const [activeModal, setActiveModal] = useState(null);
   const [selectedEntry, setSelectedEntry] = useState(null);
 
-  // --- Estado de Dados (Com salvamento no LocalStorage) ---
   const [config, setConfig] = useState(() => {
     try {
       const saved = localStorage.getItem('motolog_config');
@@ -36,7 +34,6 @@ export default function App() {
     return [];
   });
 
-  // NOVO ESTADO: Viagem Ativa
   const [activeTrip, setActiveTrip] = useState(() => {
     try {
       const saved = localStorage.getItem('motolog_active_trip');
@@ -44,7 +41,6 @@ export default function App() {
     } catch (e) { return null; }
   });
 
-  // Gravação automática no LocalStorage
   useEffect(() => { localStorage.setItem('motolog_config', JSON.stringify(config)); }, [config]);
   useEffect(() => { localStorage.setItem('motolog_fuel', JSON.stringify(currentFuel)); }, [currentFuel]);
   useEffect(() => { localStorage.setItem('motolog_entries', JSON.stringify(entries)); }, [entries]);
@@ -75,7 +71,6 @@ export default function App() {
 
   return (
     <div className="h-[100dvh] w-full bg-[#060b14] flex justify-center font-sans text-slate-200 overflow-hidden">
-      
       <div className="h-full w-full max-w-md bg-gradient-to-b from-[#0a1325] to-[#040811] relative flex flex-col shadow-2xl md:border-x md:border-slate-800 overflow-hidden">
         
         <header className="pt-8 pb-4 px-6 bg-transparent flex justify-between items-center z-10 flex-shrink-0">
@@ -125,24 +120,20 @@ export default function App() {
         <nav className="absolute bottom-0 w-full h-16 bg-[#0B1221]/95 backdrop-blur-lg border-t border-cyan-900/50 grid grid-cols-5 items-center px-1 z-50 shadow-[0_-5px_20px_rgba(0,0,0,0.5)]">
           <NavItem icon={<LayoutDashboard />} label="PAINEL" isActive={activeTab === 'PAINEL'} onClick={() => setActiveTab('PAINEL')} />
           <NavItem icon={<List />} label="LOG" isActive={activeTab === 'LOG'} onClick={() => setActiveTab('LOG')} />
-          {/* Nova Aba de Viagem no Centro */}
           <NavItem icon={<Map />} label="VIAGEM" isActive={activeTab === 'VIAGEM'} onClick={() => setActiveTab('VIAGEM')} />
           <NavItem icon={<BarChart2 />} label="RELATÓRIOS" isActive={activeTab === 'RELATÓRIOS'} onClick={() => setActiveTab('RELATÓRIOS')} />
           <NavItem icon={<Settings />} label="CONFIGS" isActive={activeTab === 'CONFIGURAÇÕES'} onClick={() => setActiveTab('CONFIGURAÇÕES')} />
         </nav>
 
-        {/* Modais */}
         {activeModal === 'abastecimento' && <ModalAbastecimento onClose={() => setActiveModal(null)} config={config} setConfig={setConfig} currentFuel={currentFuel} setCurrentFuel={setCurrentFuel} setEntries={setEntries} />}
         {activeModal === 'despesa' && <ModalDespesa onClose={() => setActiveModal(null)} config={config} setEntries={setEntries} />}
         {activeModal === 'odometro' && <ModalOdometro onClose={() => setActiveModal(null)} config={config} setConfig={setConfig} currentFuel={currentFuel} setCurrentFuel={setCurrentFuel} setEntries={setEntries} />}
         
-        {/* Novo Modal de Encerrar Viagem */}
         {activeModal === 'encerrar_viagem' && <ModalEncerrarViagem onClose={() => setActiveModal(null)} activeTrip={activeTrip} setActiveTrip={setActiveTrip} config={config} setConfig={setConfig} currentFuel={currentFuel} setCurrentFuel={setCurrentFuel} setEntries={setEntries} />}
 
         {selectedEntry && <ModalDetalhes entry={selectedEntry} onClose={() => setSelectedEntry(null)} setEntries={setEntries} />}
         {fabMenuOpen && <div className="absolute inset-0 z-30 bg-black/40 backdrop-blur-[1px]" onClick={() => setFabMenuOpen(false)} />}
       </div>
-      
       <style>
         {`
           .animate-fade-in-up { animation: fadeInUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
@@ -275,7 +266,6 @@ function TabPainel({ currentFuel, tanqueTotal, config, entries }) {
   );
 }
 
-// ABA LOG ATUALIZADA (COM FILTROS)
 function TabLog({ entries, onSelectEntry }) {
   const [filtro, setFiltro] = useState('todos');
 
@@ -292,7 +282,6 @@ function TabLog({ entries, onSelectEntry }) {
         <List className="mr-2 text-cyan-500" size={20} /> Histórico de Registros
       </h2>
       
-      {/* Sistema de Filtros */}
       <div className="flex items-center space-x-2 overflow-x-auto custom-scrollbar pb-2 px-1">
         <Filter size={16} className="text-slate-500 flex-shrink-0 mr-1" />
         <button onClick={() => setFiltro('todos')} className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors ${filtro === 'todos' ? 'bg-cyan-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}>Todos</button>
@@ -307,11 +296,7 @@ function TabLog({ entries, onSelectEntry }) {
         </div>
       ) : (
         entradasFiltradas.map(entry => (
-          <div 
-            key={entry.id} 
-            onClick={() => onSelectEntry(entry)} 
-            className="bg-[#0f172a]/80 backdrop-blur-md border border-slate-800 rounded-2xl p-4 flex items-center justify-between shadow-lg cursor-pointer hover:bg-slate-800/80 hover:border-cyan-900/50 transition-colors"
-          >
+          <div key={entry.id} onClick={() => onSelectEntry(entry)} className="bg-[#0f172a]/80 backdrop-blur-md border border-slate-800 rounded-2xl p-4 flex items-center justify-between shadow-lg cursor-pointer hover:bg-slate-800/80 hover:border-cyan-900/50 transition-colors">
             <div className="flex items-center space-x-4">
               {entry.type === 'abastecimento' ? (
                 <div className="bg-emerald-500/20 p-3 rounded-full border border-emerald-500/30 flex-shrink-0"><Fuel className="text-emerald-400" size={20} /></div>
@@ -352,46 +337,114 @@ function TabLog({ entries, onSelectEntry }) {
   );
 }
 
-// --- NOVA ABA: VIAGEM ---
+// Funções Matemáticas do GPS
+function calcHaversine(lat1, lon1, lat2, lon2) {
+  const R = 6371; // Raio da Terra em km
+  const dLat = (lat2 - lat1) * (Math.PI / 180);
+  const dLon = (lon2 - lon1) * (Math.PI / 180);
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
 function TabViagem({ config, entries, activeTrip, setActiveTrip, onStopTrip }) {
-  const [distanciaPlan, setDistanciaPlan] = useState('');
-  
-  // Encontra o preço do último abastecimento para usar no cálculo
   const ultimoAbast = entries.find(e => e.type === 'abastecimento');
   const [precoPlan, setPrecoPlan] = useState(ultimoAbast ? ultimoAbast.precoLitro : 5.89);
+  
+  // Estados para o Planejador GPS Automático
+  const [destinoQuery, setDestinoQuery] = useState('');
+  const [distanciaPlan, setDistanciaPlan] = useState(0);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState('');
+  const [searchSuccess, setSearchSuccess] = useState('');
 
-  // Timer da viagem ativa
+  // Estados da Viagem Ativa (Cronômetro e GPS)
   const [elapsed, setElapsed] = useState(0);
+  const [gpsKm, setGpsKm] = useState(activeTrip ? activeTrip.accumulatedKm || 0 : 0);
 
+  // Efeito do Cronômetro e Rastreador GPS
   useEffect(() => {
-    let interval;
+    let interval, watchId;
     if (activeTrip) {
-      // Atualiza o cronômetro a cada segundo
+      // Cronômetro
       interval = setInterval(() => {
         setElapsed(Math.floor((Date.now() - activeTrip.startTime) / 1000));
       }, 1000);
+
+      // Rastreador GPS em Tempo Real
+      if ('geolocation' in navigator) {
+        watchId = navigator.geolocation.watchPosition(
+          (position) => {
+            const { latitude, longitude } = position.coords;
+            setActiveTrip(prev => {
+              if (!prev) return prev;
+              const newKm = prev.lastLat ? calcHaversine(prev.lastLat, prev.lastLon, latitude, longitude) : 0;
+              // Só atualiza se moveu mais de 10 metros para evitar "pulos" do GPS parado
+              if (newKm > 0.01) {
+                const updatedKm = prev.accumulatedKm + newKm;
+                setGpsKm(updatedKm);
+                return { ...prev, lastLat: latitude, lastLon: longitude, accumulatedKm: updatedKm };
+              }
+              return { ...prev, lastLat: prev.lastLat || latitude, lastLon: prev.lastLon || longitude };
+            });
+          },
+          (error) => console.log("Erro no GPS:", error),
+          { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
+        );
+      }
     }
-    return () => clearInterval(interval);
-  }, [activeTrip]);
+    return () => {
+      clearInterval(interval);
+      if (watchId) navigator.geolocation.clearWatch(watchId);
+    };
+  }, [activeTrip, setActiveTrip]);
 
   const formatTime = (seconds) => {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = seconds % 60;
+    const h = Math.floor(seconds / 3600); const m = Math.floor((seconds % 3600) / 60); const s = seconds % 60;
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
   const handleStartTrip = () => {
-    setActiveTrip({
-      startTime: Date.now(),
-      startOdo: config.odometro
-    });
+    setActiveTrip({ startTime: Date.now(), startOdo: config.odometro, accumulatedKm: 0, lastLat: null, lastLon: null });
+    setGpsKm(0);
+  };
+
+  // Função Mágica para Calcular Rota pelo Nome da Cidade
+  const handleCalcularRota = async () => {
+    if (!destinoQuery) return;
+    setIsSearching(true); setSearchError(''); setSearchSuccess(''); setDistanciaPlan(0);
+
+    try {
+      // 1. Pega GPS atual
+      const pos = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true });
+      });
+      const currLat = pos.coords.latitude; const currLon = pos.coords.longitude;
+
+      // 2. Acha a cidade digitada (Nominatim OSM)
+      const geoRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(destinoQuery)}`);
+      const geoData = await geoRes.json();
+      if (geoData.length === 0) throw new Error('Destino não encontrado.');
+      const destLat = geoData[0].lat; const destLon = geoData[0].lon;
+
+      // 3. Calcula a rota rodoviária (OSRM)
+      const routeRes = await fetch(`https://router.project-osrm.org/route/v1/driving/${currLon},${currLat};${destLon},${destLat}?overview=false`);
+      const routeData = await routeRes.json();
+      if (routeData.code !== 'Ok') throw new Error('Não foi possível traçar uma rota rodoviária.');
+
+      const distanceInKm = (routeData.routes[0].distance / 1000).toFixed(1);
+      setDistanciaPlan(parseFloat(distanceInKm));
+      setSearchSuccess(`Rota traçada até ${geoData[0].name.split(',')[0]}!`);
+    } catch (err) {
+      if (err.code === 1) setSearchError('Ligue o GPS do celular para calcular.');
+      else setSearchError(err.message || 'Erro ao calcular a rota.');
+    }
+    setIsSearching(false);
   };
 
   const calcLitros = (parseFloat(distanciaPlan) || 0) / config.kmL;
   const calcCusto = calcLitros * (parseFloat(precoPlan) || 0);
 
-  // TELA DE VIAGEM EM ANDAMENTO
   if (activeTrip) {
     return (
       <div className="flex flex-col items-center justify-center h-full pt-4 space-y-6 animate-fade-in-up">
@@ -399,26 +452,18 @@ function TabViagem({ config, entries, activeTrip, setActiveTrip, onStopTrip }) {
           <div className="absolute top-0 right-0 p-4 opacity-20"><Navigation size={100} /></div>
           
           <div className="bg-indigo-500/20 text-indigo-300 px-4 py-1 rounded-full text-xs font-bold uppercase tracking-widest mb-6 flex items-center">
-            <span className="w-2 h-2 bg-indigo-400 rounded-full animate-pulse mr-2"></span> Viagem em Andamento
+            <span className="w-2 h-2 bg-indigo-400 rounded-full animate-pulse mr-2"></span> GPS Rastreado
           </div>
           
           <div className="text-6xl font-black font-mono text-transparent bg-clip-text bg-gradient-to-r from-indigo-300 to-purple-400 drop-shadow-md z-10">
             {formatTime(elapsed)}
           </div>
-          <span className="text-xs text-slate-400 uppercase tracking-widest mt-2 font-medium z-10">Tempo Decorrido</span>
+          <span className="text-xs text-slate-400 uppercase tracking-widest mt-1 mb-6 font-medium z-10">Tempo Decorrido</span>
 
-          <div className="w-full grid grid-cols-2 gap-4 mt-8 z-10">
-            <div className="bg-slate-900/60 rounded-2xl p-4 flex flex-col items-center border border-slate-700/50">
-              <Gauge className="text-slate-500 mb-1" size={18} />
-              <span className="text-[10px] text-slate-400 uppercase">Km Inicial</span>
-              <span className="text-lg font-bold font-mono text-slate-200">{activeTrip.startOdo}</span>
-            </div>
-            <div className="bg-slate-900/60 rounded-2xl p-4 flex flex-col items-center border border-slate-700/50">
-              <Calendar className="text-slate-500 mb-1" size={18} />
-              <span className="text-[10px] text-slate-400 uppercase">Partida</span>
-              <span className="text-sm font-bold text-slate-200 mt-1">{new Date(activeTrip.startTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-            </div>
+          <div className="text-4xl font-bold font-mono text-cyan-400 z-10">
+            {gpsKm.toFixed(1)} <span className="text-sm text-cyan-600">KM</span>
           </div>
+          <span className="text-[10px] text-slate-500 text-center mt-1 z-10">(Mantenha a tela ligada para atualizar o GPS perfeitamente)</span>
         </div>
 
         <button onClick={onStopTrip} className="w-full bg-red-600 hover:bg-red-500 text-white font-black uppercase tracking-wider py-5 rounded-2xl shadow-[0_0_20px_rgba(220,38,38,0.4)] transition-all flex items-center justify-center text-lg active:scale-95">
@@ -428,32 +473,41 @@ function TabViagem({ config, entries, activeTrip, setActiveTrip, onStopTrip }) {
     );
   }
 
-  // TELA DE MENU / PLANEJAMENTO
   return (
     <div className="flex flex-col space-y-6 pt-4 animate-fade-in-up">
       <h2 className="text-lg font-bold text-slate-300 px-2 flex items-center"><Map className="mr-2 text-indigo-400" size={20} /> Painel de Viagem</h2>
       
-      {/* Botão de Iniciar Rota */}
       <div className="bg-gradient-to-br from-[#0f172a] to-[#1e1b4b] border border-indigo-900/50 rounded-3xl p-6 shadow-lg relative overflow-hidden">
         <div className="relative z-10 flex flex-col items-start">
           <h3 className="text-lg font-black text-indigo-300 mb-1">Rodar com a Moto</h3>
-          <p className="text-xs text-slate-400 mb-5 max-w-[200px]">Inicie o cronômetro, pegue a estrada e registre os dados exatos no final.</p>
+          <p className="text-xs text-slate-400 mb-5 max-w-[200px]">Inicie o rastreamento GPS e registre sua rota no final.</p>
           <button onClick={handleStartTrip} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-4 rounded-2xl shadow-[0_0_15px_rgba(79,70,229,0.4)] transition-all flex items-center justify-center active:scale-95">
-            <Play size={20} className="mr-2 fill-current" /> Iniciar Viagem Agora
+            <Play size={20} className="mr-2 fill-current" /> Iniciar GPS Agora
           </button>
         </div>
         <div className="absolute -right-4 -bottom-4 opacity-30 text-indigo-500"><Route size={120} /></div>
       </div>
 
-      {/* Calculadora Inteligente */}
       <div className="bg-[#0f172a]/80 backdrop-blur-md border border-slate-800 rounded-3xl p-5">
-        <h3 className="text-sm font-bold text-slate-300 flex items-center mb-4"><Navigation className="mr-2 text-cyan-500" size={18} /> Planejador de Rotas</h3>
+        <h3 className="text-sm font-bold text-slate-300 flex items-center mb-4"><Navigation className="mr-2 text-cyan-500" size={18} /> Calculadora de Rota GPS</h3>
         
         <div className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-xs text-slate-400 ml-1">Para onde você vai?</label>
+            <div className="flex space-x-2">
+              <input type="text" value={destinoQuery} onChange={(e) => setDestinoQuery(e.target.value)} placeholder="Ex: Caruaru, PE" className="flex-1 bg-slate-900 border border-slate-700 rounded-xl p-3 text-white focus:border-cyan-500 focus:outline-none text-sm" />
+              <button onClick={handleCalcularRota} disabled={isSearching} className="bg-cyan-600 hover:bg-cyan-500 text-white p-3 rounded-xl transition-colors disabled:opacity-50">
+                {isSearching ? <Loader2 size={20} className="animate-spin" /> : <Search size={20} />}
+              </button>
+            </div>
+            {searchError && <p className="text-[10px] text-red-400 ml-1">{searchError}</p>}
+            {searchSuccess && <p className="text-[10px] text-emerald-400 ml-1">{searchSuccess}</p>}
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-slate-400 ml-1">Distância Ida (km)</label>
-              <input type="number" value={distanciaPlan} onChange={(e) => setDistanciaPlan(e.target.value)} placeholder="Ex: 150" className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl p-3 text-white font-mono focus:border-cyan-500 focus:outline-none" />
+              <input type="number" readOnly value={distanciaPlan || ''} placeholder="Automático" className="w-full mt-1 bg-slate-900/50 border border-slate-800 rounded-xl p-3 text-slate-400 font-mono focus:outline-none" />
             </div>
             <div>
               <label className="text-xs text-slate-400 ml-1">Preço Combustível</label>
@@ -461,7 +515,7 @@ function TabViagem({ config, entries, activeTrip, setActiveTrip, onStopTrip }) {
             </div>
           </div>
           
-          <div className="bg-slate-900 border border-cyan-900/30 rounded-2xl p-4">
+          <div className="bg-slate-900 border border-cyan-900/30 rounded-2xl p-4 transition-all">
             <span className="block text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-3 text-center">Estimativa para a Viagem</span>
             <div className="flex justify-around items-center">
               <div className="flex flex-col items-center">
@@ -474,9 +528,6 @@ function TabViagem({ config, entries, activeTrip, setActiveTrip, onStopTrip }) {
                 <span className="text-[10px] text-slate-400 mt-1">Custo Estimado</span>
               </div>
             </div>
-            <div className="mt-4 text-[9px] text-slate-500 text-center flex justify-center items-center">
-              <Info size={10} className="mr-1" /> Calculado com base na média de {config.kmL} km/L configurada.
-            </div>
           </div>
         </div>
       </div>
@@ -486,44 +537,22 @@ function TabViagem({ config, entries, activeTrip, setActiveTrip, onStopTrip }) {
 
 function TabRelatorios({ entries, config }) {
   const [monthFilter, setMonthFilter] = useState(() => {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
 
   const { consumoMedio, kmMes, gastoCombustivel, gastoManutencao, gastoGeral } = useMemo(() => {
-    const [yearStr, monthStr] = monthFilter.split('-');
-    const filterYear = parseInt(yearStr, 10);
-    const filterMonth = parseInt(monthStr, 10) - 1; 
-
-    const entriesMes = entries.filter(e => {
-      const d = new Date(e.date);
-      return d.getUTCMonth() === filterMonth && d.getUTCFullYear() === filterYear;
-    });
-
+    const [yearStr, monthStr] = monthFilter.split('-'); const filterYear = parseInt(yearStr, 10); const filterMonth = parseInt(monthStr, 10) - 1; 
+    const entriesMes = entries.filter(e => { const d = new Date(e.date); return d.getUTCMonth() === filterMonth && d.getUTCFullYear() === filterYear; });
     const abastecimentosMes = entriesMes.filter(e => e.type === 'abastecimento');
     const despesasMes = entriesMes.filter(e => e.type === 'despesa');
-
     const gastoComb = abastecimentosMes.reduce((acc, curr) => acc + (curr.valorTotal || 0), 0);
     const gastoManut = despesasMes.reduce((acc, curr) => acc + (curr.valor || 0), 0);
     const litrosTotais = abastecimentosMes.reduce((acc, curr) => acc + (curr.litros || 0), 0);
-    
-    let minOdo = config.odometro;
-    let maxOdo = config.odometro;
-    if (abastecimentosMes.length > 0) {
-      const odos = abastecimentosMes.map(e => e.odometro);
-      maxOdo = Math.max(...odos);
-      minOdo = Math.min(...odos);
-    }
+    let minOdo = config.odometro; let maxOdo = config.odometro;
+    if (abastecimentosMes.length > 0) { const odos = abastecimentosMes.map(e => e.odometro); maxOdo = Math.max(...odos); minOdo = Math.min(...odos); }
     const rodados = maxOdo - minOdo;
     const media = litrosTotais > 0 && rodados > 0 ? (rodados / litrosTotais) : config.kmL;
-
-    return { 
-      consumoMedio: media.toFixed(1), 
-      kmMes: rodados, 
-      gastoCombustivel: gastoComb.toFixed(2),
-      gastoManutencao: gastoManut.toFixed(2),
-      gastoGeral: (gastoComb + gastoManut).toFixed(2)
-    };
+    return { consumoMedio: media.toFixed(1), kmMes: rodados, gastoCombustivel: gastoComb.toFixed(2), gastoManutencao: gastoManut.toFixed(2), gastoGeral: (gastoComb + gastoManut).toFixed(2) };
   }, [entries, config, monthFilter]);
 
   return (
@@ -532,7 +561,6 @@ function TabRelatorios({ entries, config }) {
         <h2 className="text-lg font-bold text-slate-300 flex items-center"><BarChart2 className="mr-2 text-cyan-500" size={20} /> Relatórios</h2>
         <input type="month" value={monthFilter} onChange={(e) => setMonthFilter(e.target.value)} className="bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-lg px-2 py-1 focus:outline-none focus:border-cyan-500" />
       </div>
-
       <div className="bg-gradient-to-br from-cyan-900/40 to-blue-900/20 border border-cyan-800/50 rounded-3xl p-6 relative overflow-hidden">
         <div className="absolute -right-4 -top-4 opacity-10"><Gauge size={100} /></div>
         <div className="relative z-10 flex flex-col">
@@ -542,14 +570,11 @@ function TabRelatorios({ entries, config }) {
             <span className="text-lg text-cyan-500/80 font-bold">Km/L</span>
           </div>
           <div className="mt-4 flex items-center text-xs text-slate-400">
-            <div className="w-full bg-slate-800 h-1.5 rounded-full mr-3 overflow-hidden">
-              <div className="bg-gradient-to-r from-cyan-500 to-emerald-500 h-full rounded-full" style={{ width: '75%' }}></div>
-            </div>
+            <div className="w-full bg-slate-800 h-1.5 rounded-full mr-3 overflow-hidden"><div className="bg-gradient-to-r from-cyan-500 to-emerald-500 h-full rounded-full" style={{ width: '75%' }}></div></div>
             <span>Meta: {config.kmL}</span>
           </div>
         </div>
       </div>
-      
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-[#0f172a]/80 backdrop-blur-md border border-slate-800 rounded-2xl p-4 flex flex-col justify-between h-28">
           <div className="flex justify-between items-start mb-2"><span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Km Rodados</span><Gauge size={16} className="text-purple-400" /></div>
@@ -583,94 +608,69 @@ function TabConfiguracoes({ config, currentFuel, entries, onCalculate, onImportD
 
   const handleChange = (e) => setLocalConfig(prev => ({ ...prev, [e.target.name]: parseFloat(e.target.value) || 0 }));
 
-  const handleSubmit = (e) => {
-    e.preventDefault(); onCalculate(localConfig);
-    setSaved(true); setTimeout(() => setSaved(false), 3000);
-  };
+  const handleSubmit = (e) => { e.preventDefault(); onCalculate(localConfig); setSaved(true); setTimeout(() => setSaved(false), 3000); };
 
   const handleExportBackup = async () => {
     try {
-      const dataToExport = { config, currentFuel, entries, exportDate: new Date().toISOString() };
-      const jsonString = JSON.stringify(dataToExport, null, 2);
-      const fileName = `motolog_backup_${new Date().toISOString().split('T')[0]}.json`;
-      const blob = new Blob([jsonString], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = fileName;
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      setBackupMsg({ text: 'Verifique a pasta de Downloads!', type: 'success' });
+      const blob = new Blob([JSON.stringify({ config, currentFuel, entries, exportDate: new Date().toISOString() }, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `motolog_backup_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+      setBackupMsg({ text: 'Backup exportado!', type: 'success' });
     } catch (err) { setBackupMsg({ text: 'Erro ao gerar backup.', type: 'error' }); }
     setTimeout(() => setBackupMsg({ text: '', type: '' }), 4000);
   };
 
   const handleImportBackup = (e) => {
-    const file = e.target.files[0]; if (!file) return;
-    const reader = new FileReader();
+    const file = e.target.files[0]; if (!file) return; const reader = new FileReader();
     reader.onload = (event) => {
       try {
-        const importedData = JSON.parse(event.target.result);
-        if (importedData.config && importedData.entries !== undefined) {
-          onImportData(importedData); setBackupMsg({ text: 'Dados restaurados com sucesso!', type: 'success' });
-        } else { setBackupMsg({ text: 'Arquivo inválido.', type: 'error' }); }
+        const data = JSON.parse(event.target.result);
+        if (data.config && data.entries !== undefined) { onImportData(data); setBackupMsg({ text: 'Dados restaurados!', type: 'success' }); } 
+        else { setBackupMsg({ text: 'Arquivo inválido.', type: 'error' }); }
       } catch (err) { setBackupMsg({ text: 'Formato incorreto.', type: 'error' }); }
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      setTimeout(() => setBackupMsg({ text: '', type: '' }), 4000);
+      if (fileInputRef.current) fileInputRef.current.value = ''; setTimeout(() => setBackupMsg({ text: '', type: '' }), 4000);
     };
     reader.readAsText(file);
+  };
+
+  // BOTÃO ZERAR RETORNOU AQUI
+  const handleWipeData = () => {
+    if (confirmReset) {
+      onResetData();
+      setConfirmReset(false);
+      setBackupMsg({ text: 'Todos os registros foram apagados!', type: 'success' });
+      setTimeout(() => setBackupMsg({ text: '', type: '' }), 4000);
+    } else {
+      setConfirmReset(true);
+      setTimeout(() => setConfirmReset(false), 3000);
+    }
   };
 
   return (
     <div className="flex flex-col space-y-6 pt-4 animate-fade-in-up">
       <h2 className="text-lg font-bold text-slate-300 px-2 flex items-center"><Settings className="mr-2 text-cyan-500" size={20} /> Parâmetros do Veículo</h2>
       <form onSubmit={handleSubmit} className="bg-[#0f172a]/80 backdrop-blur-md border border-slate-800 rounded-2xl p-5 space-y-5">
-        <div className="space-y-1">
-          <label className="text-xs font-medium text-slate-400 uppercase tracking-wider ml-1">Tanque Total (L)</label>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500"><Droplets size={16} /></div>
-            <input type="number" name="tanqueTotal" value={localConfig.tanqueTotal} onChange={handleChange} step="0.1" className="w-full bg-[#060b14] border border-slate-700 text-slate-200 rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:border-cyan-500 font-mono" />
-          </div>
-        </div>
-        <div className="space-y-1">
-          <label className="text-xs font-medium text-slate-400 uppercase tracking-wider ml-1">Meta / Média (Km/L)</label>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500"><BarChart2 size={16} /></div>
-            <input type="number" name="kmL" value={localConfig.kmL} onChange={handleChange} step="0.1" className="w-full bg-[#060b14] border border-slate-700 text-slate-200 rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:border-cyan-500 font-mono" />
-          </div>
-        </div>
-        <div className="space-y-1">
-          <label className="text-xs font-medium text-slate-400 uppercase tracking-wider ml-1">Odômetro Atual (km)</label>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500"><Gauge size={16} /></div>
-            <input type="number" name="odometro" value={localConfig.odometro} onChange={handleChange} className="w-full bg-[#060b14] border border-slate-700 text-slate-200 rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:border-cyan-500 font-mono" />
-          </div>
-        </div>
-        <button type="submit" className={`w-full mt-4 font-bold py-3.5 rounded-xl transition-all flex justify-center items-center ${saved ? 'bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)]' : 'bg-teal-500 hover:bg-teal-400 text-slate-900 shadow-[0_0_15px_rgba(20,184,166,0.4)]'}`}>
-          {saved ? <><CheckCircle2 className="mr-2" size={20} /> Salvo!</> : 'Salvar Manualmente'}
-        </button>
+        <div className="space-y-1"><label className="text-xs font-medium text-slate-400 uppercase tracking-wider ml-1">Tanque Total (L)</label><div className="relative"><div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500"><Droplets size={16} /></div><input type="number" name="tanqueTotal" value={localConfig.tanqueTotal} onChange={handleChange} step="0.1" className="w-full bg-[#060b14] border border-slate-700 text-slate-200 rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:border-cyan-500 font-mono" /></div></div>
+        <div className="space-y-1"><label className="text-xs font-medium text-slate-400 uppercase tracking-wider ml-1">Meta / Média (Km/L)</label><div className="relative"><div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500"><BarChart2 size={16} /></div><input type="number" name="kmL" value={localConfig.kmL} onChange={handleChange} step="0.1" className="w-full bg-[#060b14] border border-slate-700 text-slate-200 rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:border-cyan-500 font-mono" /></div></div>
+        <div className="space-y-1"><label className="text-xs font-medium text-slate-400 uppercase tracking-wider ml-1">Odômetro Atual (km)</label><div className="relative"><div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500"><Gauge size={16} /></div><input type="number" name="odometro" value={localConfig.odometro} onChange={handleChange} className="w-full bg-[#060b14] border border-slate-700 text-slate-200 rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:border-cyan-500 font-mono" /></div></div>
+        <button type="submit" className={`w-full mt-4 font-bold py-3.5 rounded-xl transition-all flex justify-center items-center ${saved ? 'bg-emerald-500 text-white' : 'bg-teal-500 text-slate-900'}`}>{saved ? <><CheckCircle2 className="mr-2" size={20} /> Salvo!</> : 'Salvar Manualmente'}</button>
       </form>
 
       <div className="bg-[#0f172a]/80 backdrop-blur-md border border-slate-800 rounded-2xl p-5 space-y-4">
         <h3 className="text-sm font-bold text-slate-300 flex items-center border-b border-slate-800 pb-2"><Database className="mr-2 text-cyan-500" size={18} /> Gerenciamento de Dados</h3>
-        
-        {backupMsg.text && (
-          <div className={`flex items-center p-3 rounded-lg text-xs font-medium ${backupMsg.type === 'success' ? 'bg-emerald-900/30 text-emerald-400 border border-emerald-800/50' : 'bg-red-900/30 text-red-400 border border-red-800/50'}`}>
-            {backupMsg.type === 'success' ? <CheckCircle2 size={16} className="mr-2" /> : <AlertCircle size={16} className="mr-2" />} {backupMsg.text}
-          </div>
-        )}
-        
+        {backupMsg.text && (<div className={`flex items-center p-3 rounded-lg text-xs font-medium ${backupMsg.type === 'success' ? 'bg-emerald-900/30 text-emerald-400' : 'bg-red-900/30 text-red-400'}`}>{backupMsg.text}</div>)}
         <div className="grid grid-cols-2 gap-3 pt-2">
-          <button onClick={handleExportBackup} className="flex flex-col items-center justify-center p-3 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-xl text-cyan-400">
-            <Download size={20} className="mb-1" /><span className="text-xs font-bold">Exportar</span>
-          </button>
-          <label className="flex flex-col items-center justify-center p-3 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-xl text-purple-400 cursor-pointer">
-            <Upload size={20} className="mb-1" /><span className="text-xs font-bold">Importar</span>
-            <input type="file" accept=".json" onChange={handleImportBackup} ref={fileInputRef} className="hidden" />
-          </label>
+          <button onClick={handleExportBackup} className="flex flex-col items-center justify-center p-3 bg-slate-800 border border-slate-600 rounded-xl text-cyan-400"><Download size={20} className="mb-1" /><span className="text-xs font-bold">Exportar</span></button>
+          <label className="flex flex-col items-center justify-center p-3 bg-slate-800 border border-slate-600 rounded-xl text-purple-400 cursor-pointer"><Upload size={20} className="mb-1" /><span className="text-xs font-bold">Importar</span><input type="file" accept=".json" onChange={handleImportBackup} ref={fileInputRef} className="hidden" /></label>
         </div>
+        
+        {/* BOTÃO ZERAR DE VOLTA AQUI */}
+        <button onClick={handleWipeData} className={`w-full mt-2 flex items-center justify-center p-3 rounded-xl transition-colors border ${confirmReset ? 'bg-red-600 hover:bg-red-500 text-white border-red-500 shadow-[0_0_15px_rgba(220,38,38,0.4)]' : 'bg-slate-900/50 hover:bg-slate-800 border-red-900/30 text-red-400'}`}>
+          <Trash2 size={18} className="mr-2" />
+          <span className="text-sm font-bold">{confirmReset ? 'Clique novamente para Confirmar!' : 'Zerar Todos os Dados'}</span>
+        </button>
       </div>
-
-      {/* FOOTER ASSINATURA DO DESENVOLVEDOR */}
+      
       <div className="mt-8 pb-4 flex flex-col items-center justify-center border-t border-slate-800/50 pt-6 opacity-70">
         <span className="text-[10px] text-slate-500 uppercase tracking-widest font-medium">Desenvolvido por</span>
         <span className="text-xs font-bold text-cyan-500 tracking-wider mt-1">Joseilton Constâncio</span>
@@ -681,7 +681,7 @@ function TabConfiguracoes({ config, currentFuel, entries, onCalculate, onImportD
 
 function NavItem({ icon, label, isActive, onClick }) {
   return (
-    <button onClick={onClick} className={`flex flex-col items-center justify-center w-full h-full transition-colors ${isActive ? 'text-cyan-400' : 'text-slate-500 hover:text-slate-300'}`}>
+    <button onClick={onClick} className={`flex flex-col items-center justify-center w-full h-full transition-colors ${isActive ? 'text-cyan-400' : 'text-slate-500'}`}>
       <div className={`mb-1 transition-transform duration-300 ${isActive ? '-translate-y-1' : ''}`}>{icon}</div>
       <span className="text-[9px] font-bold tracking-wider">{label}</span>
       {isActive && <div className="absolute bottom-0 w-8 h-1 bg-cyan-400 rounded-t-md shadow-[0_0_10px_#22d3ee]"></div>}
@@ -689,101 +689,68 @@ function NavItem({ icon, label, isActive, onClick }) {
   );
 }
 
-// --- MODAIS (Abastecimento, Despesa, Odometro e Detalhes simplificados para espaço) ---
 function ModalAbastecimento({ onClose, config, setConfig, currentFuel, setCurrentFuel, setEntries }) {
   const [formData, setFormData] = useState({ data: new Date().toISOString().split('T')[0], odometro: config.odometro, litros: '', valorTotal: '', descricao: '' });
   const [isFullTank, setIsFullTank] = useState(false);
   const precoLitro = useMemo(() => { const l = parseFloat(formData.litros); const v = parseFloat(formData.valorTotal); return (l > 0 && v > 0) ? (v / l).toFixed(2) : '0.00'; }, [formData.litros, formData.valorTotal]);
 
   const handleSubmit = (e) => {
-    e.preventDefault();
-    const l = parseFloat(formData.litros) || 0; const o = parseFloat(formData.odometro) || config.odometro;
+    e.preventDefault(); const l = parseFloat(formData.litros) || 0; const o = parseFloat(formData.odometro) || config.odometro;
     isFullTank ? setCurrentFuel(config.tanqueTotal) : setCurrentFuel(prev => Math.min(config.tanqueTotal, prev + l));
     if (o > config.odometro) setConfig(prev => ({ ...prev, odometro: o }));
     setEntries(prev => [{ id: Date.now(), type: 'abastecimento', date: new Date(formData.data + 'T12:00:00Z').toISOString(), odometro: o, litros: l, valorTotal: parseFloat(formData.valorTotal)||0, precoLitro: parseFloat(precoLitro), isFullTank, descricao: formData.descricao }, ...prev]);
     onClose();
   };
-  // HTML (Mesmo de antes, abreviado por espaço)
   return <ModalWrapper title="Novo Abastecimento" color="emerald" icon={<Fuel size={24}/>} onClose={onClose}>
     <form onSubmit={handleSubmit} className="space-y-4">
       <Input label="Data" type="date" value={formData.data} onChange={e => setFormData({...formData, data: e.target.value})} />
-      <div className="flex bg-slate-900 border border-slate-700 rounded-xl p-1 mt-1">
-        <button type="button" onClick={() => setIsFullTank(false)} className={`flex-1 py-2 text-xs font-bold rounded-lg ${!isFullTank ? 'bg-slate-700 text-white' : 'text-slate-400'}`}>Parcial</button>
-        <button type="button" onClick={() => setIsFullTank(true)} className={`flex-1 py-2 text-xs font-bold rounded-lg ${isFullTank ? 'bg-emerald-600 text-white' : 'text-slate-400'}`}>Completar Tanque</button>
-      </div>
+      <div className="flex bg-slate-900 border border-slate-700 rounded-xl p-1 mt-1"><button type="button" onClick={() => setIsFullTank(false)} className={`flex-1 py-2 text-xs font-bold rounded-lg ${!isFullTank ? 'bg-slate-700 text-white' : 'text-slate-400'}`}>Parcial</button><button type="button" onClick={() => setIsFullTank(true)} className={`flex-1 py-2 text-xs font-bold rounded-lg ${isFullTank ? 'bg-emerald-600 text-white' : 'text-slate-400'}`}>Completar Tanque</button></div>
       <Input label="Odômetro (km)" type="number" value={formData.odometro} onChange={e => setFormData({...formData, odometro: e.target.value})} />
       <div className="grid grid-cols-2 gap-3"><Input label="Litros" type="number" step="0.01" value={formData.litros} onChange={e => setFormData({...formData, litros: e.target.value})} /><Input label="Valor Total (R$)" type="number" step="0.01" value={formData.valorTotal} onChange={e => setFormData({...formData, valorTotal: e.target.value})} /></div>
-      <button type="submit" className="w-full mt-6 bg-emerald-600 text-white font-bold py-3 rounded-xl shadow-[0_0_15px_rgba(16,185,129,0.3)]">Salvar</button>
+      <button type="submit" className="w-full mt-6 bg-emerald-600 text-white font-bold py-3 rounded-xl">Salvar</button>
     </form>
   </ModalWrapper>
 }
 
 function ModalDespesa({ onClose, config, setEntries }) {
   const [formData, setFormData] = useState({ data: new Date().toISOString().split('T')[0], titulo: '', valor: '', descricao: '' });
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    setEntries(prev => [{ id: Date.now(), type: 'despesa', date: new Date(formData.data + 'T12:00:00Z').toISOString(), titulo: formData.titulo, valor: parseFloat(formData.valor)||0, odometro: config.odometro, descricao: formData.descricao }, ...prev]);
-    onClose();
-  };
+  const handleSubmit = (e) => { e.preventDefault(); setEntries(prev => [{ id: Date.now(), type: 'despesa', date: new Date(formData.data + 'T12:00:00Z').toISOString(), titulo: formData.titulo, valor: parseFloat(formData.valor)||0, odometro: config.odometro, descricao: formData.descricao }, ...prev]); onClose(); };
   return <ModalWrapper title="Nova Despesa" color="red" icon={<Wrench size={24}/>} onClose={onClose}>
     <form onSubmit={handleSubmit} className="space-y-4">
       <Input label="Data" type="date" value={formData.data} onChange={e => setFormData({...formData, data: e.target.value})} />
       <Input label="Título da Despesa" type="text" value={formData.titulo} onChange={e => setFormData({...formData, titulo: e.target.value})} />
       <Input label="Valor Total (R$)" type="number" step="0.01" value={formData.valor} onChange={e => setFormData({...formData, valor: e.target.value})} />
-      <button type="submit" className="w-full mt-6 bg-red-600 text-white font-bold py-3 rounded-xl shadow-[0_0_15px_rgba(220,38,38,0.3)]">Salvar</button>
+      <button type="submit" className="w-full mt-6 bg-red-600 text-white font-bold py-3 rounded-xl">Salvar</button>
     </form>
   </ModalWrapper>
 }
 
 function ModalOdometro({ onClose, config, setConfig, currentFuel, setCurrentFuel, setEntries }) {
-  const [data, setData] = useState(new Date().toISOString().split('T')[0]);
-  const [novoOdometro, setNovoOdometro] = useState('');
-  const handleSubmit = (e) => {
-    e.preventDefault(); const val = parseFloat(novoOdometro); if (isNaN(val) || val <= config.odometro) return;
-    const diffKm = val - config.odometro; const litrosGastos = diffKm / (config.kmL || 1);
-    setCurrentFuel(Math.max(0, currentFuel - litrosGastos)); setConfig(prev => ({ ...prev, odometro: val }));
-    setEntries(prev => [{ id: Date.now(), type: 'viagem', date: new Date(data + 'T12:00:00Z').toISOString(), titulo: 'Atualização de Rota', kmRodados: diffKm, litrosGastos, descricao: '' }, ...prev]);
-    onClose();
-  };
+  const [data, setData] = useState(new Date().toISOString().split('T')[0]); const [novoOdometro, setNovoOdometro] = useState('');
+  const handleSubmit = (e) => { e.preventDefault(); const val = parseFloat(novoOdometro); if (isNaN(val) || val <= config.odometro) return; const diffKm = val - config.odometro; const litrosGastos = diffKm / (config.kmL || 1); setCurrentFuel(Math.max(0, currentFuel - litrosGastos)); setConfig(prev => ({ ...prev, odometro: val })); setEntries(prev => [{ id: Date.now(), type: 'viagem', date: new Date(data + 'T12:00:00Z').toISOString(), titulo: 'Atualização de Rota', kmRodados: diffKm, litrosGastos, descricao: '' }, ...prev]); onClose(); };
   return <ModalWrapper title="Atualizar Odômetro" color="purple" icon={<MapPin size={24}/>} onClose={onClose}>
     <form onSubmit={handleSubmit} className="space-y-4">
       <Input label="Novo Odômetro (km)" type="number" value={novoOdometro} onChange={e => setNovoOdometro(e.target.value)} placeholder={`Atual: ${config.odometro}`} />
-      <button type="submit" className="w-full mt-6 bg-purple-600 text-white font-bold py-3 rounded-xl shadow-[0_0_15px_rgba(147,51,234,0.3)]">Confirmar</button>
+      <button type="submit" className="w-full mt-6 bg-purple-600 text-white font-bold py-3 rounded-xl">Confirmar</button>
     </form>
   </ModalWrapper>
 }
 
-// NOVO: Modal para encerrar a viagem!
 function ModalEncerrarViagem({ onClose, activeTrip, setActiveTrip, config, setConfig, currentFuel, setCurrentFuel, setEntries }) {
-  const [odoFinal, setOdoFinal] = useState('');
+  const kmGpsSugerido = config.odometro + (activeTrip?.accumulatedKm || 0);
+  const [odoFinal, setOdoFinal] = useState(Math.round(kmGpsSugerido).toString());
   const [desc, setDesc] = useState('');
   const [erro, setErro] = useState('');
 
   const handleSubmit = (e) => {
-    e.preventDefault();
-    const final = parseFloat(odoFinal);
-    if (isNaN(final) || final <= activeTrip.startOdo) {
-      setErro('O Km final deve ser maior que o inicial.');
-      return;
-    }
-    
-    // Cálculos
-    const kmRodados = final - activeTrip.startOdo;
-    const litrosGastos = kmRodados / (config.kmL || 1);
+    e.preventDefault(); const final = parseFloat(odoFinal);
+    if (isNaN(final) || final <= activeTrip.startOdo) { setErro('O Km final deve ser maior que o inicial.'); return; }
+    const kmRodados = final - activeTrip.startOdo; const litrosGastos = kmRodados / (config.kmL || 1);
     const segundos = Math.floor((Date.now() - activeTrip.startTime) / 1000);
-    const h = Math.floor(segundos / 3600); const m = Math.floor((segundos % 3600) / 60);
-    const duracaoTexto = `${h > 0 ? h + 'h ' : ''}${m}m`;
-
-    // Atualiza Estado
-    setCurrentFuel(prev => Math.max(0, prev - litrosGastos));
-    setConfig(prev => ({ ...prev, odometro: final }));
-    setEntries(prev => [{ 
-      id: Date.now(), type: 'viagem', date: new Date().toISOString(), 
-      titulo: 'Viagem Registrada', kmRodados, litrosGastos, duracao: duracaoTexto, descricao: desc 
-    }, ...prev]);
-    
-    setActiveTrip(null);
-    onClose();
+    const h = Math.floor(segundos / 3600); const m = Math.floor((segundos % 3600) / 60); const duracaoTexto = `${h > 0 ? h + 'h ' : ''}${m}m`;
+    setCurrentFuel(prev => Math.max(0, prev - litrosGastos)); setConfig(prev => ({ ...prev, odometro: final }));
+    setEntries(prev => [{ id: Date.now(), type: 'viagem', date: new Date().toISOString(), titulo: 'Viagem Registrada', kmRodados, litrosGastos, duracao: duracaoTexto, descricao: desc }, ...prev]);
+    setActiveTrip(null); onClose();
   };
 
   return (
@@ -794,15 +761,13 @@ function ModalEncerrarViagem({ onClose, activeTrip, setActiveTrip, config, setCo
           <span className="text-lg font-bold font-mono text-white">{activeTrip?.startOdo}</span>
         </div>
         <div>
-          <label className="text-xs text-slate-400 ml-1">Odômetro de Chegada (Km)</label>
+          <label className="text-xs text-slate-400 ml-1">Odômetro de Chegada (Km do painel da moto)</label>
           <input type="number" required value={odoFinal} onChange={e => {setOdoFinal(e.target.value); setErro('');}} className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl p-3 text-white font-mono focus:border-indigo-500 focus:outline-none" />
+          <p className="text-[10px] text-slate-500 mt-1 ml-1">Valor acima sugerido pelo rastreador do GPS. Corrija se necessário.</p>
           {erro && <span className="text-[10px] text-red-400 mt-1">{erro}</span>}
         </div>
-        <div>
-          <label className="text-xs text-slate-400 ml-1">Destino ou Descrição (Opcional)</label>
-          <input type="text" value={desc} onChange={e => setDesc(e.target.value)} className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl p-3 text-white focus:border-indigo-500 focus:outline-none" />
-        </div>
-        <button type="submit" className="w-full mt-6 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-xl shadow-[0_0_15px_rgba(79,70,229,0.3)]">Salvar Viagem</button>
+        <div><label className="text-xs text-slate-400 ml-1">Destino ou Descrição (Opcional)</label><input type="text" value={desc} onChange={e => setDesc(e.target.value)} className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl p-3 text-white focus:border-indigo-500 focus:outline-none" /></div>
+        <button type="submit" className="w-full mt-6 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-xl">Salvar Viagem</button>
       </form>
     </ModalWrapper>
   );
@@ -824,7 +789,6 @@ function ModalDetalhes({ entry, onClose, setEntries }) {
   </ModalWrapper>
 }
 
-// Utilitários de UI para os Modais
 function ModalWrapper({ title, color, icon, onClose, children }) {
   const colorMap = { emerald: 'from-emerald-600 to-cyan-500', red: 'from-red-600 to-orange-500', purple: 'from-purple-600 to-indigo-500', indigo: 'from-indigo-600 to-purple-500', slate: 'from-slate-600 to-slate-400' };
   const textMap = { emerald: 'text-emerald-500', red: 'text-red-500', purple: 'text-purple-500', indigo: 'text-indigo-500', slate: 'text-slate-300' };
@@ -834,10 +798,7 @@ function ModalWrapper({ title, color, icon, onClose, children }) {
       <div className="relative w-full max-w-sm bg-[#111827] rounded-3xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-fade-in-up">
         <div className={`h-2 bg-gradient-to-r ${colorMap[color]} w-full`}></div>
         <div className="p-5 overflow-y-auto custom-scrollbar">
-          <div className="flex justify-between items-center mb-5">
-            <h3 className="text-xl font-bold text-slate-100 flex items-center"><span className={`${textMap[color]} mr-2`}>{icon}</span> {title}</h3>
-            <button onClick={onClose} className="p-1 text-slate-400 bg-slate-800 rounded-full"><X size={20} /></button>
-          </div>
+          <div className="flex justify-between items-center mb-5"><h3 className="text-xl font-bold text-slate-100 flex items-center"><span className={`${textMap[color]} mr-2`}>{icon}</span> {title}</h3><button onClick={onClose} className="p-1 text-slate-400 bg-slate-800 rounded-full"><X size={20} /></button></div>
           {children}
         </div>
       </div>
@@ -845,10 +806,5 @@ function ModalWrapper({ title, color, icon, onClose, children }) {
   );
 }
 function Input({ label, type, value, onChange, step, placeholder }) {
-  return (
-    <div>
-      <label className="text-xs text-slate-400 ml-1">{label}</label>
-      <input type={type} required step={step} value={value} onChange={onChange} placeholder={placeholder} className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl p-3 text-white font-mono focus:border-cyan-500 focus:outline-none" />
-    </div>
-  );
+  return <div><label className="text-xs text-slate-400 ml-1">{label}</label><input type={type} required step={step} value={value} onChange={onChange} placeholder={placeholder} className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl p-3 text-white font-mono focus:border-cyan-500 focus:outline-none" /></div>;
 }
