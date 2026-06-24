@@ -14,8 +14,15 @@
     }
   ],
   "start_url": "/",
-  "background_color": "#060b14",
-  "theme_color": "#060b14",
+  "background_color": "#0a1325",
+  "theme_color": "#0a1325",
   "display": "standalone",
-  "orientation": "portrait"
+  "orientation": "portrait",
+  "splash_screens": [
+    {
+      "src": "splash.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ]
 }
