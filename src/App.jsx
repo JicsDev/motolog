@@ -346,10 +346,9 @@ function calcHaversine(lat1, lon1, lat2, lon2) {
   return R * c;
 }
 
-function TabViagem({ config, entries, activeTrip, setActiveTrip, onStopTrip }) {
+function TabViagem({ config, entries, activeTrip, setActiveTrip, onStopTrip, currentFuel }) {
   const ultimoAbast = entries.find(e => e.type === 'abastecimento');
   const [precoPlan, setPrecoPlan] = useState(ultimoAbast ? ultimoAbast.precoLitro : 5.89);
-  
   const [destinoQuery, setDestinoQuery] = useState('');
   const [distanciaPlan, setDistanciaPlan] = useState(0);
   const [isSearching, setIsSearching] = useState(false);
@@ -405,115 +404,92 @@ function TabViagem({ config, entries, activeTrip, setActiveTrip, onStopTrip }) {
     setActiveTrip(prev => ({ ...prev, isPaused: !prev.isPaused, elapsedTime: elapsed, lastLat: null, lastLon: null }));
   };
 
+  const handleCalcularRota = async () => {
+    if (!destinoQuery) return;
+    setIsSearching(true); setSearchError(''); setSearchSuccess(''); setDistanciaPlan(0);
+    try {
+      const pos = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true }));
+      const geoRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(destinoQuery)}`);
+      const geoData = await geoRes.json();
+      if (geoData.length === 0) throw new Error('Destino não encontrado.');
+      const routeRes = await fetch(`https://router.project-osrm.org/route/v1/driving/${pos.coords.longitude},${pos.coords.latitude};${geoData[0].lon},${geoData[0].lat}?overview=false`);
+      const routeData = await routeRes.json();
+      setDistanciaPlan((routeData.routes[0].distance / 1000).toFixed(1));
+      setSearchSuccess(`Rota traçada!`);
+    } catch (err) { setSearchError('Erro ao buscar rota. Ative o GPS.'); }
+    setIsSearching(false);
+  };
+
   const calcLitros = (parseFloat(distanciaPlan) || 0) / config.kmL;
   const calcCusto = calcLitros * (parseFloat(precoPlan) || 0);
 
-  // Lógica das mensagens de combustível
-  const getFuelMessage = () => {
-    if (distanciaPlan <= 0) return null;
-    const diferenca = config.currentFuel - calcLitros; // O app usa currentFuel do estado principal
-    // Nota: Como estamos dentro da função, vamos usar a prop 'currentFuel' que veio lá do App.js pai
-    // Ajuste: A prop foi passada para TabViagem, então vou usar ela aqui:
-  };
-  
-  // Vamos usar 'currentFuel' que vem como prop (notei que não passei no TabViagem do código anterior, vou adicionar agora)
-  // *Dica: Certifique-se de chamar <TabViagem ... currentFuel={currentFuel} ... /> lá no App principal*
+  // --- RENDERIZAÇÃO QUANDO VIAGEM ESTÁ ATIVA ---
+  if (activeTrip) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full pt-4 space-y-6 animate-fade-in-up">
+        <div className={`border rounded-3xl p-6 w-full flex flex-col items-center shadow-[0_0_30px_rgba(0,0,0,0.3)] relative overflow-hidden ${activeTrip.isPaused ? 'bg-amber-900/20 border-amber-500/30' : 'bg-indigo-900/30 border-indigo-500/50'}`}>
+          <span className={`text-xs font-bold mb-2 flex items-center z-10 ${activeTrip.isPaused ? 'text-amber-500' : 'text-cyan-500'}`}>
+             {activeTrip.isPaused ? <><div className="w-2 h-2 bg-amber-500 rounded-full mr-2"></div> VIAGEM PAUSADA</> : <><div className="w-2 h-2 bg-red-500 rounded-full animate-pulse mr-2"></div> AO VIVO</>}
+          </span>
+          <div className="text-7xl font-black font-mono text-cyan-300">{activeTrip.isPaused ? '--' : Math.round(currentSpeed)}</div>
+          <span className="text-sm text-slate-400 uppercase tracking-widest mb-6">km/h</span>
+          <div className="w-full grid grid-cols-2 gap-4 border-t border-indigo-500/30 pt-6">
+             <div className="text-center"><p className="text-xl font-bold text-white">{formatTime(elapsed)}</p><p className="text-[9px] text-slate-400">TEMPO</p></div>
+             <div className="text-center"><p className="text-xl font-bold text-purple-400">{gpsKm.toFixed(1)} km</p><p className="text-[9px] text-slate-400">DISTÂNCIA</p></div>
+          </div>
+        </div>
+        <div className="w-full flex space-x-3">
+          <button onClick={handleTogglePause} className={`flex-1 font-black py-5 rounded-2xl transition-all ${activeTrip.isPaused ? 'bg-emerald-600' : 'bg-amber-600'}`}>
+            {activeTrip.isPaused ? 'RETOMAR' : 'PAUSAR'}
+          </button>
+          <button onClick={onStopTrip} className="flex-1 bg-red-600 text-white font-black py-5 rounded-2xl">ENCERRAR</button>
+        </div>
+      </div>
+    );
+  }
 
+  // --- RENDERIZAÇÃO PADRÃO (SELEÇÃO DE ROTA) ---
   return (
     <div className="flex flex-col space-y-6 pt-4 animate-fade-in-up">
-      {/* ... [resto do código igual] ... */}
+      <h2 className="text-lg font-bold text-slate-300 px-2 flex items-center"><Map className="mr-2 text-indigo-400" size={20} /> Painel de Viagem</h2>
+      <button onClick={handleStartTrip} className="w-full bg-indigo-600 text-white font-bold py-4 rounded-2xl shadow-lg">Iniciar Rota Agora</button>
+      
       <div className="bg-[#0f172a]/80 backdrop-blur-md border border-slate-800 rounded-3xl p-5">
         <h3 className="text-sm font-bold text-slate-300 mb-4">Calculadora de Rota</h3>
-        {/* ... [inputs de busca igual] ... */}
-        
-        {distanciaPlan > 0 && (
-          <div className="space-y-3">
-             <div className="grid grid-cols-2 gap-3">
-                <div className="bg-slate-900 p-3 rounded-xl border border-slate-700">
-                    <p className="text-[10px] text-slate-400">Litros Necessários</p>
-                    <p className="text-lg font-bold text-white">{calcLitros.toFixed(1)} L</p>
+        <div className="space-y-4">
+           <div className="flex space-x-2"><input type="text" value={destinoQuery} onChange={(e) => setDestinoQuery(e.target.value)} placeholder="Destino..." className="flex-1 bg-slate-900 p-3 rounded-xl text-white text-sm border border-slate-700" /><button onClick={handleCalcularRota} className="bg-cyan-600 p-3 rounded-xl text-white">{isSearching ? <Loader2 className="animate-spin"/> : <Search />}</button></div>
+           
+           <div className="grid grid-cols-2 gap-3">
+              <input type="number" readOnly value={distanciaPlan || ''} placeholder="Distância (km)" className="bg-slate-900/50 border border-slate-800 rounded-xl p-3 text-slate-400" />
+              <input type="number" value={precoPlan} onChange={(e) => setPrecoPlan(e.target.value)} placeholder="Preço (R$)" className="bg-slate-900 border border-slate-700 rounded-xl p-3 text-white" />
+           </div>
+
+           {distanciaPlan > 0 && (
+            <div className="space-y-3 mt-4">
+                <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-slate-900 p-3 rounded-xl border border-slate-700 text-center">
+                        <p className="text-[10px] text-slate-400 uppercase">Litros Necessários</p>
+                        <p className="text-lg font-bold text-white">{calcLitros.toFixed(1)} L</p>
+                    </div>
+                    <div className="bg-slate-900 p-3 rounded-xl border border-slate-700 text-center">
+                        <p className="text-[10px] text-slate-400 uppercase">Custo Estimado</p>
+                        <p className="text-lg font-bold text-emerald-400">R$ {calcCusto.toFixed(2)}</p>
+                    </div>
                 </div>
-                <div className="bg-slate-900 p-3 rounded-xl border border-slate-700">
-                    <p className="text-[10px] text-slate-400">Custo Estimado</p>
-                    <p className="text-lg font-bold text-emerald-400">R$ {calcCusto.toFixed(2)}</p>
+                <div className={`p-3 rounded-xl border ${calcLitros > currentFuel ? 'bg-red-900/20 border-red-800 text-red-400' : (currentFuel - calcLitros < 1 ? 'bg-amber-900/20 border-amber-800 text-amber-400' : 'bg-emerald-900/20 border-emerald-800 text-emerald-400')}`}>
+                    <p className="text-xs font-bold text-center">
+                    {calcLitros > currentFuel ? "⚠️ Combustível insuficiente para a viagem!" : 
+                        (currentFuel - calcLitros < 1 ? "⚠️ Combustível no limite! Considere abastecer." : "✅ Combustível suficiente. Boa viagem!")}
+                    </p>
                 </div>
-             </div>
-             
-             {/* Mensagem Inteligente */}
-             <div className={`p-3 rounded-xl border ${calcLitros > currentFuel ? 'bg-red-900/20 border-red-800 text-red-400' : (currentFuel - calcLitros < 1 ? 'bg-amber-900/20 border-amber-800 text-amber-400' : 'bg-emerald-900/20 border-emerald-800 text-emerald-400')}`}>
-                <p className="text-xs font-bold text-center">
-                   {calcLitros > currentFuel ? "⚠️ Combustível insuficiente para a viagem!" : 
-                    (currentFuel - calcLitros < 1 ? "⚠️ Combustível no limite! Considere abastecer." : "✅ Combustível suficiente. Boa viagem!")}
-                </p>
-             </div>
-          </div>
-        )}
+            </div>
+           )}
+        </div>
       </div>
     </div>
   );
 }
 
-function TabRelatorios({ entries, config }) {
-  const [monthFilter, setMonthFilter] = useState(() => {
-    const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  });
-
-  const { consumoMedio, kmMes, gastoCombustivel, gastoManutencao, gastoGeral } = useMemo(() => {
-    const [yearStr, monthStr] = monthFilter.split('-'); const filterYear = parseInt(yearStr, 10); const filterMonth = parseInt(monthStr, 10) - 1; 
-    const entriesMes = entries.filter(e => { const d = new Date(e.date); return d.getUTCMonth() === filterMonth && d.getUTCFullYear() === filterYear; });
-    const abastecimentosMes = entriesMes.filter(e => e.type === 'abastecimento');
-    const despesasMes = entriesMes.filter(e => e.type === 'despesa');
-    const gastoComb = abastecimentosMes.reduce((acc, curr) => acc + (curr.valorTotal || 0), 0);
-    const gastoManut = despesasMes.reduce((acc, curr) => acc + (curr.valor || 0), 0);
-    const litrosTotais = abastecimentosMes.reduce((acc, curr) => acc + (curr.litros || 0), 0);
-    let minOdo = config.odometro; let maxOdo = config.odometro;
-    if (abastecimentosMes.length > 0) { const odos = abastecimentosMes.map(e => e.odometro); maxOdo = Math.max(...odos); minOdo = Math.min(...odos); }
-    const rodados = maxOdo - minOdo;
-    const media = litrosTotais > 0 && rodados > 0 ? (rodados / litrosTotais) : config.kmL;
-    return { consumoMedio: media.toFixed(1), kmMes: rodados, gastoCombustivel: gastoComb.toFixed(2), gastoManutencao: gastoManut.toFixed(2), gastoGeral: (gastoComb + gastoManut).toFixed(2) };
-  }, [entries, config, monthFilter]);
-
-  return (
-    <div className="flex flex-col space-y-5 pt-4 animate-fade-in-up">
-      <div className="flex items-center justify-between px-2">
-        <h2 className="text-lg font-bold text-slate-300 flex items-center"><BarChart2 className="mr-2 text-cyan-500" size={20} /> Relatórios</h2>
-        <input type="month" value={monthFilter} onChange={(e) => setMonthFilter(e.target.value)} className="bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-lg px-2 py-1 focus:outline-none focus:border-cyan-500" />
-      </div>
-      <div className="bg-gradient-to-br from-cyan-900/40 to-blue-900/20 border border-cyan-800/50 rounded-3xl p-6 relative overflow-hidden">
-        <div className="absolute -right-4 -top-4 opacity-10"><Gauge size={100} /></div>
-        <div className="relative z-10 flex flex-col">
-          <span className="text-sm font-medium text-cyan-400/80 mb-1">Consumo Médio Atual</span>
-          <div className="flex items-baseline space-x-2">
-            <span className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-emerald-300 font-mono">{consumoMedio}</span>
-            <span className="text-lg text-cyan-500/80 font-bold">Km/L</span>
-          </div>
-          <div className="mt-4 flex items-center text-xs text-slate-400">
-            <div className="w-full bg-slate-800 h-1.5 rounded-full mr-3 overflow-hidden"><div className="bg-gradient-to-r from-cyan-500 to-emerald-500 h-full rounded-full" style={{ width: '75%' }}></div></div>
-            <span>Meta: {config.kmL}</span>
-          </div>
-        </div>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div className="bg-[#0f172a]/80 backdrop-blur-md border border-slate-800 rounded-2xl p-4 flex flex-col justify-between h-28">
-          <div className="flex justify-between items-start mb-2"><span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Km Rodados</span><Gauge size={16} className="text-purple-400" /></div>
-          <span className="text-xl font-bold text-slate-100 font-mono">{kmMes} <span className="text-xs text-slate-500">km</span></span>
-        </div>
-        <div className="bg-[#0f172a]/80 backdrop-blur-md border border-slate-800 rounded-2xl p-4 flex flex-col justify-between h-28">
-          <div className="flex justify-between items-start mb-2"><span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Combustível</span><Fuel size={16} className="text-emerald-400" /></div>
-          <span className="text-lg font-bold text-emerald-400 font-mono">R$ {gastoCombustivel}</span>
-        </div>
-        <div className="bg-[#0f172a]/80 backdrop-blur-md border border-slate-800 rounded-2xl p-4 flex flex-col justify-between h-28">
-          <div className="flex justify-between items-start mb-2"><span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Manutenção</span><Wrench size={16} className="text-red-400" /></div>
-          <span className="text-lg font-bold text-red-400 font-mono">R$ {gastoManutencao}</span>
-        </div>
-        <div className="bg-gradient-to-br from-slate-800 to-[#0f172a] border border-slate-700 rounded-2xl p-4 flex flex-col justify-between h-28 shadow-lg">
-          <div className="flex justify-between items-start mb-2"><span className="text-[10px] font-bold text-slate-300 uppercase tracking-wide">Custo Total</span><Wallet size={16} className="text-cyan-400" /></div>
-          <span className="text-lg font-bold text-slate-100 font-mono">R$ {gastoGeral}</span>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function TabConfiguracoes({ config, currentFuel, entries, onCalculate, onImportData, onResetData }) {
   const [localConfig, setLocalConfig] = useState(config);
