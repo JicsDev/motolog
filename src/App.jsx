@@ -490,7 +490,6 @@ function TabViagem({ config, entries, activeTrip, setActiveTrip, onStopTrip, cur
   );
 }
 
-
 function TabConfiguracoes({ config, currentFuel, entries, onCalculate, onImportData, onResetData }) {
   const [localConfig, setLocalConfig] = useState(config);
   const [saved, setSaved] = useState(false);
