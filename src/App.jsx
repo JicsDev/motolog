@@ -337,9 +337,8 @@ function TabLog({ entries, onSelectEntry }) {
   );
 }
 
-// Funções Matemáticas do GPS
 function calcHaversine(lat1, lon1, lat2, lon2) {
-  const R = 6371; // Raio da Terra em km
+  const R = 6371; 
   const dLat = (lat2 - lat1) * (Math.PI / 180);
   const dLon = (lon2 - lon1) * (Math.PI / 180);
   const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * Math.sin(dLon/2) * Math.sin(dLon/2);
@@ -351,35 +350,39 @@ function TabViagem({ config, entries, activeTrip, setActiveTrip, onStopTrip }) {
   const ultimoAbast = entries.find(e => e.type === 'abastecimento');
   const [precoPlan, setPrecoPlan] = useState(ultimoAbast ? ultimoAbast.precoLitro : 5.89);
   
-  // Estados para o Planejador GPS Automático
   const [destinoQuery, setDestinoQuery] = useState('');
   const [distanciaPlan, setDistanciaPlan] = useState(0);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState('');
   const [searchSuccess, setSearchSuccess] = useState('');
 
-  // Estados da Viagem Ativa (Cronômetro e GPS)
+  // ESTADOS DA VIAGEM
   const [elapsed, setElapsed] = useState(0);
   const [gpsKm, setGpsKm] = useState(activeTrip ? activeTrip.accumulatedKm || 0 : 0);
+  const [currentSpeed, setCurrentSpeed] = useState(0); // NOVO: Guarda a velocidade em km/h
 
-  // Efeito do Cronômetro e Rastreador GPS
   useEffect(() => {
     let interval, watchId;
     if (activeTrip) {
-      // Cronômetro
       interval = setInterval(() => {
         setElapsed(Math.floor((Date.now() - activeTrip.startTime) / 1000));
       }, 1000);
 
-      // Rastreador GPS em Tempo Real
       if ('geolocation' in navigator) {
         watchId = navigator.geolocation.watchPosition(
           (position) => {
-            const { latitude, longitude } = position.coords;
+            const { latitude, longitude, speed } = position.coords;
+            
+            // ATUALIZA O VELOCÍMETRO
+            if (speed !== null) {
+              setCurrentSpeed(speed * 3.6); // Converte m/s para km/h
+            } else {
+              setCurrentSpeed(0);
+            }
+
             setActiveTrip(prev => {
               if (!prev) return prev;
               const newKm = prev.lastLat ? calcHaversine(prev.lastLat, prev.lastLon, latitude, longitude) : 0;
-              // Só atualiza se moveu mais de 10 metros para evitar "pulos" do GPS parado
               if (newKm > 0.01) {
                 const updatedKm = prev.accumulatedKm + newKm;
                 setGpsKm(updatedKm);
@@ -407,27 +410,24 @@ function TabViagem({ config, entries, activeTrip, setActiveTrip, onStopTrip }) {
   const handleStartTrip = () => {
     setActiveTrip({ startTime: Date.now(), startOdo: config.odometro, accumulatedKm: 0, lastLat: null, lastLon: null });
     setGpsKm(0);
+    setCurrentSpeed(0);
   };
 
-  // Função Mágica para Calcular Rota pelo Nome da Cidade
   const handleCalcularRota = async () => {
     if (!destinoQuery) return;
     setIsSearching(true); setSearchError(''); setSearchSuccess(''); setDistanciaPlan(0);
 
     try {
-      // 1. Pega GPS atual
       const pos = await new Promise((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true });
       });
       const currLat = pos.coords.latitude; const currLon = pos.coords.longitude;
 
-      // 2. Acha a cidade digitada (Nominatim OSM)
       const geoRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(destinoQuery)}`);
       const geoData = await geoRes.json();
       if (geoData.length === 0) throw new Error('Destino não encontrado.');
       const destLat = geoData[0].lat; const destLon = geoData[0].lon;
 
-      // 3. Calcula a rota rodoviária (OSRM)
       const routeRes = await fetch(`https://router.project-osrm.org/route/v1/driving/${currLon},${currLat};${destLon},${destLat}?overview=false`);
       const routeData = await routeRes.json();
       if (routeData.code !== 'Ok') throw new Error('Não foi possível traçar uma rota rodoviária.');
@@ -445,25 +445,33 @@ function TabViagem({ config, entries, activeTrip, setActiveTrip, onStopTrip }) {
   const calcLitros = (parseFloat(distanciaPlan) || 0) / config.kmL;
   const calcCusto = calcLitros * (parseFloat(precoPlan) || 0);
 
+  // TELA DE VIAGEM EM ANDAMENTO COM VELOCÍMETRO
   if (activeTrip) {
     return (
       <div className="flex flex-col items-center justify-center h-full pt-4 space-y-6 animate-fade-in-up">
-        <div className="bg-indigo-900/30 border border-indigo-500/50 rounded-3xl p-8 w-full flex flex-col items-center shadow-[0_0_30px_rgba(99,102,241,0.2)] relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-4 opacity-20"><Navigation size={100} /></div>
-          
-          <div className="bg-indigo-500/20 text-indigo-300 px-4 py-1 rounded-full text-xs font-bold uppercase tracking-widest mb-6 flex items-center">
-            <span className="w-2 h-2 bg-indigo-400 rounded-full animate-pulse mr-2"></span> GPS Rastreado
-          </div>
-          
-          <div className="text-6xl font-black font-mono text-transparent bg-clip-text bg-gradient-to-r from-indigo-300 to-purple-400 drop-shadow-md z-10">
-            {formatTime(elapsed)}
-          </div>
-          <span className="text-xs text-slate-400 uppercase tracking-widest mt-1 mb-6 font-medium z-10">Tempo Decorrido</span>
+        <div className="bg-indigo-900/30 border border-indigo-500/50 rounded-3xl p-6 w-full flex flex-col items-center shadow-[0_0_30px_rgba(99,102,241,0.2)] relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-4 opacity-10"><Gauge size={120} /></div>
 
-          <div className="text-4xl font-bold font-mono text-cyan-400 z-10">
-            {gpsKm.toFixed(1)} <span className="text-sm text-cyan-600">KM</span>
+          {/* Velocímetro em Destaque */}
+          <span className="text-xs text-cyan-500 uppercase tracking-widest font-bold mb-1 flex items-center z-10">
+            <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse mr-2"></span> AO VIVO
+          </span>
+          <div className="text-7xl font-black font-mono text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-emerald-400 drop-shadow-[0_0_15px_rgba(34,211,238,0.3)] z-10 transition-all duration-300">
+            {Math.round(currentSpeed)}
           </div>
-          <span className="text-[10px] text-slate-500 text-center mt-1 z-10">(Mantenha a tela ligada para atualizar o GPS perfeitamente)</span>
+          <span className="text-sm font-bold text-cyan-700 uppercase tracking-widest mb-6 z-10">km/h</span>
+
+          {/* Timer e Km */}
+          <div className="w-full grid grid-cols-2 gap-4 border-t border-indigo-500/30 pt-6 z-10">
+             <div className="flex flex-col items-center">
+               <span className="text-2xl font-bold font-mono text-indigo-300">{formatTime(elapsed)}</span>
+               <span className="text-[9px] text-slate-400 uppercase tracking-wider mt-1">Tempo</span>
+             </div>
+             <div className="flex flex-col items-center border-l border-indigo-500/30">
+               <span className="text-2xl font-bold font-mono text-purple-400">{gpsKm.toFixed(1)} <span className="text-sm">km</span></span>
+               <span className="text-[9px] text-slate-400 uppercase tracking-wider mt-1">Distância</span>
+             </div>
+          </div>
         </div>
 
         <button onClick={onStopTrip} className="w-full bg-red-600 hover:bg-red-500 text-white font-black uppercase tracking-wider py-5 rounded-2xl shadow-[0_0_20px_rgba(220,38,38,0.4)] transition-all flex items-center justify-center text-lg active:scale-95">
@@ -480,9 +488,9 @@ function TabViagem({ config, entries, activeTrip, setActiveTrip, onStopTrip }) {
       <div className="bg-gradient-to-br from-[#0f172a] to-[#1e1b4b] border border-indigo-900/50 rounded-3xl p-6 shadow-lg relative overflow-hidden">
         <div className="relative z-10 flex flex-col items-start">
           <h3 className="text-lg font-black text-indigo-300 mb-1">Rodar com a Moto</h3>
-          <p className="text-xs text-slate-400 mb-5 max-w-[200px]">Inicie o rastreamento GPS e registre sua rota no final.</p>
+          <p className="text-xs text-slate-400 mb-5 max-w-[200px]">Inicie o rastreamento GPS e acompanhe sua velocidade e rota.</p>
           <button onClick={handleStartTrip} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-4 rounded-2xl shadow-[0_0_15px_rgba(79,70,229,0.4)] transition-all flex items-center justify-center active:scale-95">
-            <Play size={20} className="mr-2 fill-current" /> Iniciar GPS Agora
+            <Play size={20} className="mr-2 fill-current" /> Iniciar Rota Agora
           </button>
         </div>
         <div className="absolute -right-4 -bottom-4 opacity-30 text-indigo-500"><Route size={120} /></div>
@@ -495,7 +503,7 @@ function TabViagem({ config, entries, activeTrip, setActiveTrip, onStopTrip }) {
           <div className="space-y-2">
             <label className="text-xs text-slate-400 ml-1">Para onde você vai?</label>
             <div className="flex space-x-2">
-              <input type="text" value={destinoQuery} onChange={(e) => setDestinoQuery(e.target.value)} placeholder="Ex: Caruaru, PE" className="flex-1 bg-slate-900 border border-slate-700 rounded-xl p-3 text-white focus:border-cyan-500 focus:outline-none text-sm" />
+              <input type="text" value={destinoQuery} onChange={(e) => setDestinoQuery(e.target.value)} placeholder="Ex: Serra Talhada, PE" className="flex-1 bg-slate-900 border border-slate-700 rounded-xl p-3 text-white focus:border-cyan-500 focus:outline-none text-sm" />
               <button onClick={handleCalcularRota} disabled={isSearching} className="bg-cyan-600 hover:bg-cyan-500 text-white p-3 rounded-xl transition-colors disabled:opacity-50">
                 {isSearching ? <Loader2 size={20} className="animate-spin" /> : <Search size={20} />}
               </button>
@@ -633,7 +641,6 @@ function TabConfiguracoes({ config, currentFuel, entries, onCalculate, onImportD
     reader.readAsText(file);
   };
 
-  // BOTÃO ZERAR RETORNOU AQUI
   const handleWipeData = () => {
     if (confirmReset) {
       onResetData();
@@ -664,7 +671,6 @@ function TabConfiguracoes({ config, currentFuel, entries, onCalculate, onImportD
           <label className="flex flex-col items-center justify-center p-3 bg-slate-800 border border-slate-600 rounded-xl text-purple-400 cursor-pointer"><Upload size={20} className="mb-1" /><span className="text-xs font-bold">Importar</span><input type="file" accept=".json" onChange={handleImportBackup} ref={fileInputRef} className="hidden" /></label>
         </div>
         
-        {/* BOTÃO ZERAR DE VOLTA AQUI */}
         <button onClick={handleWipeData} className={`w-full mt-2 flex items-center justify-center p-3 rounded-xl transition-colors border ${confirmReset ? 'bg-red-600 hover:bg-red-500 text-white border-red-500 shadow-[0_0_15px_rgba(220,38,38,0.4)]' : 'bg-slate-900/50 hover:bg-slate-800 border-red-900/30 text-red-400'}`}>
           <Trash2 size={18} className="mr-2" />
           <span className="text-sm font-bold">{confirmReset ? 'Clique novamente para Confirmar!' : 'Zerar Todos os Dados'}</span>
