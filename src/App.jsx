@@ -349,23 +349,24 @@ function calcHaversine(lat1, lon1, lat2, lon2) {
 function TabViagem({ config, entries, activeTrip, setActiveTrip, onStopTrip }) {
   const ultimoAbast = entries.find(e => e.type === 'abastecimento');
   const [precoPlan, setPrecoPlan] = useState(ultimoAbast ? ultimoAbast.precoLitro : 5.89);
+  
   const [destinoQuery, setDestinoQuery] = useState('');
   const [distanciaPlan, setDistanciaPlan] = useState(0);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState('');
   const [searchSuccess, setSearchSuccess] = useState('');
 
-  // ESTADOS DA VIAGEM
-  const [elapsed, setElapsed] = useState(0);
+  const [elapsed, setElapsed] = useState(activeTrip ? activeTrip.elapsedTime || 0 : 0);
   const [gpsKm, setGpsKm] = useState(activeTrip ? activeTrip.accumulatedKm || 0 : 0);
   const [currentSpeed, setCurrentSpeed] = useState(0); 
   const lastUpdateRef = useRef(Date.now());
 
   useEffect(() => {
     let interval, watchId;
-    if (activeTrip) {
+    // Só roda o rastreamento se a viagem existir E NÃO estiver pausada
+    if (activeTrip && !activeTrip.isPaused) {
       interval = setInterval(() => {
-        setElapsed(Math.floor((Date.now() - activeTrip.startTime) / 1000));
+        setElapsed(prev => prev + 1);
       }, 1000);
 
       if ('geolocation' in navigator) {
@@ -375,34 +376,28 @@ function TabViagem({ config, entries, activeTrip, setActiveTrip, onStopTrip }) {
             const now = Date.now();
             
             setActiveTrip(prev => {
-              if (!prev) return prev;
+              if (!prev || prev.isPaused) return prev;
               
               let newKm = 0;
               let calculatedSpeed = 0;
 
               if (prev.lastLat && prev.lastLon) {
                 newKm = calcHaversine(prev.lastLat, prev.lastLon, latitude, longitude);
-                
-                // Cálculo de velocidade robusto (Distância / Tempo)
                 const timeDiffInHours = (now - lastUpdateRef.current) / 3600000;
-                if (timeDiffInHours > 0) {
-                    calculatedSpeed = newKm / timeDiffInHours;
-                }
+                if (timeDiffInHours > 0) calculatedSpeed = newKm / timeDiffInHours;
               }
 
-              // Filtro: só atualiza se moveu, suaviza velocidade
               if (newKm > 0.005) { 
                 const updatedKm = prev.accumulatedKm + newKm;
                 setGpsKm(updatedKm);
-                setCurrentSpeed(calculatedSpeed > 150 ? prev.speed || 0 : calculatedSpeed); // Filtra picos irreais
+                setCurrentSpeed(calculatedSpeed > 150 ? prev.speed || 0 : calculatedSpeed);
                 lastUpdateRef.current = now;
                 return { ...prev, lastLat: latitude, lastLon: longitude, accumulatedKm: updatedKm, speed: calculatedSpeed };
               }
-              
               return { ...prev, lastLat: latitude, lastLon: longitude };
             });
           },
-          (error) => console.log("GPS aguardando sinal..."),
+          (error) => console.log("GPS aguardando..."),
           { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
         );
       }
@@ -419,10 +414,17 @@ function TabViagem({ config, entries, activeTrip, setActiveTrip, onStopTrip }) {
   };
 
   const handleStartTrip = () => {
-    setActiveTrip({ startTime: Date.now(), startOdo: config.odometro, accumulatedKm: 0, lastLat: null, lastLon: null });
-    setGpsKm(0);
-    setCurrentSpeed(0);
-    lastUpdateRef.current = Date.now();
+    setActiveTrip({ startTime: Date.now(), elapsedTime: 0, startOdo: config.odometro, accumulatedKm: 0, lastLat: null, lastLon: null, isPaused: false });
+    setGpsKm(0); setElapsed(0); setCurrentSpeed(0); lastUpdateRef.current = Date.now();
+  };
+
+  const handleTogglePause = () => {
+    setActiveTrip(prev => ({ 
+      ...prev, 
+      isPaused: !prev.isPaused, 
+      elapsedTime: elapsed, // Salva o tempo atual antes de pausar
+      lastLat: null, lastLon: null // Reseta lat/lon para não calcular distância no "pulo" da pausa
+    }));
   };
 
   const handleCalcularRota = async () => {
@@ -447,16 +449,24 @@ function TabViagem({ config, entries, activeTrip, setActiveTrip, onStopTrip }) {
   if (activeTrip) {
     return (
       <div className="flex flex-col items-center justify-center h-full pt-4 space-y-6 animate-fade-in-up">
-        <div className="bg-indigo-900/30 border border-indigo-500/50 rounded-3xl p-6 w-full flex flex-col items-center shadow-[0_0_30px_rgba(99,102,241,0.2)]">
-          <span className="text-xs text-cyan-500 font-bold mb-2">AO VIVO</span>
-          <div className="text-7xl font-black font-mono text-cyan-300">{Math.round(currentSpeed)}</div>
+        <div className={`border rounded-3xl p-6 w-full flex flex-col items-center shadow-[0_0_30px_rgba(0,0,0,0.3)] relative overflow-hidden ${activeTrip.isPaused ? 'bg-amber-900/20 border-amber-500/30' : 'bg-indigo-900/30 border-indigo-500/50'}`}>
+          <span className={`text-xs font-bold mb-2 flex items-center z-10 ${activeTrip.isPaused ? 'text-amber-500' : 'text-cyan-500'}`}>
+             {activeTrip.isPaused ? <><div className="w-2 h-2 bg-amber-500 rounded-full mr-2"></div> VIAGEM PAUSADA</> : <><div className="w-2 h-2 bg-red-500 rounded-full animate-pulse mr-2"></div> AO VIVO</>}
+          </span>
+          <div className="text-7xl font-black font-mono text-cyan-300">{activeTrip.isPaused ? '--' : Math.round(currentSpeed)}</div>
           <span className="text-sm text-slate-400 uppercase tracking-widest mb-6">km/h</span>
           <div className="w-full grid grid-cols-2 gap-4 border-t border-indigo-500/30 pt-6">
              <div className="text-center"><p className="text-xl font-bold text-white">{formatTime(elapsed)}</p><p className="text-[9px] text-slate-400">TEMPO</p></div>
              <div className="text-center"><p className="text-xl font-bold text-purple-400">{gpsKm.toFixed(1)} km</p><p className="text-[9px] text-slate-400">DISTÂNCIA</p></div>
           </div>
         </div>
-        <button onClick={onStopTrip} className="w-full bg-red-600 text-white font-black py-5 rounded-2xl">Encerrar Viagem</button>
+        
+        <div className="w-full flex space-x-3">
+          <button onClick={handleTogglePause} className={`flex-1 font-black py-5 rounded-2xl transition-all ${activeTrip.isPaused ? 'bg-emerald-600' : 'bg-amber-600'}`}>
+            {activeTrip.isPaused ? 'RETOMAR' : 'PAUSAR'}
+          </button>
+          <button onClick={onStopTrip} className="flex-1 bg-red-600 text-white font-black py-5 rounded-2xl">ENCERRAR</button>
+        </div>
       </div>
     );
   }
@@ -465,7 +475,6 @@ function TabViagem({ config, entries, activeTrip, setActiveTrip, onStopTrip }) {
     <div className="flex flex-col space-y-6 pt-4 animate-fade-in-up">
       <h2 className="text-lg font-bold text-slate-300 px-2 flex items-center"><Map className="mr-2 text-indigo-400" size={20} /> Painel de Viagem</h2>
       <button onClick={handleStartTrip} className="w-full bg-indigo-600 text-white font-bold py-4 rounded-2xl">Iniciar Rota Agora</button>
-      {/* Calculadora permanece igual */}
       <div className="bg-[#0f172a]/80 backdrop-blur-md border border-slate-800 rounded-3xl p-5">
         <h3 className="text-sm font-bold text-slate-300 mb-4">Calculadora de Rota</h3>
         <div className="space-y-4">
