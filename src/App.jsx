@@ -432,24 +432,49 @@ function TabViagem({ config, entries, activeTrip, setActiveTrip, onStopTrip, cur
       if ('geolocation' in navigator) {
         watchId = navigator.geolocation.watchPosition(
           (position) => {
+            // 1. IGNORA SINAIS RUINS / PULOS DE PRECISÃO
+            if (position.coords.accuracy && position.coords.accuracy > 30) return;
+
             const { latitude, longitude } = position.coords;
             const now = Date.now();
+            
+            // 2. BLOQUEIA LEITURAS MICRO-RÁPIDAS QUE GERAM PICOS MATEMÁTICOS DE VELOCIDADE
+            const timeDiffInSeconds = (now - lastUpdateRef.current) / 1000;
+            if (timeDiffInSeconds < 2) return;
+
             setActiveTrip(prev => {
               if (!prev || prev.isPaused) return prev;
               let newKm = 0; let calculatedSpeed = 0;
+              
               if (prev.lastLat && prev.lastLon) {
                 newKm = calcHaversine(prev.lastLat, prev.lastLon, latitude, longitude);
                 const timeDiffInHours = (now - lastUpdateRef.current) / 3600000;
                 if (timeDiffInHours > 0) calculatedSpeed = newKm / timeDiffInHours;
               }
+
+              // 3. FILTRO DE MOVIMENTO REAL (SÓ CONTA SE MOVEU MAIS DE 5 METROS)
               if (newKm > 0.005) { 
                 const updatedKm = prev.accumulatedKm + newKm;
                 setGpsKm(updatedKm);
-                setCurrentSpeed(calculatedSpeed > 150 ? prev.speed || 0 : calculatedSpeed);
+                
+                // Filtro passa-baixa para suavizar a transição e evitar oscilações brutas
+                const oldSpeed = prev.speed || 0;
+                const smoothedSpeed = oldSpeed === 0 ? calculatedSpeed : (oldSpeed * 0.6) + (calculatedSpeed * 0.4);
+                
+                // Corta picos irreais gerados por teletransporte de satélite
+                const finalSpeed = smoothedSpeed > 160 ? oldSpeed : smoothedSpeed;
+
+                setCurrentSpeed(finalSpeed);
                 lastUpdateRef.current = now;
-                return { ...prev, lastLat: latitude, lastLon: longitude, accumulatedKm: updatedKm, speed: calculatedSpeed };
+                return { ...prev, lastLat: latitude, lastLon: longitude, accumulatedKm: updatedKm, speed: finalSpeed };
+              } else {
+                // Se o tempo passou mas a moto parou (farol, cruzamento), cai a velocidade suavemente para 0
+                setCurrentSpeed(prevSpeed => {
+                  const nextSpeed = prevSpeed * 0.4;
+                  return nextSpeed < 2 ? 0 : nextSpeed;
+                });
+                return prev;
               }
-              return { ...prev, lastLat: latitude, lastLon: longitude };
             });
           },
           (error) => console.log("GPS aguardando..."),
@@ -734,20 +759,127 @@ function ModalEncerrarViagem({ onClose, activeTrip, setActiveTrip, config, setCo
 }
 
 function ModalDetalhes({ entry, onClose, setEntries }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editData, setEditData] = useState({ ...entry });
+
   const handleDelete = () => { setEntries(prev => prev.filter(e => e.id !== entry.id)); onClose(); };
-  return <ModalWrapper title={entry.type === 'abastecimento' ? 'Abastecimento' : entry.titulo} color="slate" icon={<Info size={24}/>} onClose={onClose}>
-    <div className="space-y-4">
-      {entry.type === 'viagem' && (
-         <div className="grid grid-cols-2 gap-4">
-           <div><p className="text-xs text-slate-500 uppercase">Km Rodados</p><p className="font-mono text-purple-400 text-lg font-bold">+{entry.kmRodados} km</p></div>
-           <div><p className="text-xs text-slate-500 uppercase">Combustível</p><p className="font-mono text-red-400 text-lg font-bold">-{entry.litrosGastos?.toFixed(1)} L</p></div>
-           {entry.duracao && <div className="col-span-2"><p className="text-xs text-slate-500 uppercase">Tempo de Viagem</p><p className="font-mono text-slate-200 font-bold">{entry.duracao}</p></div>}
-         </div>
-      )}
-      <button onClick={handleDelete} className="w-full mt-6 bg-red-900/30 text-red-400 border border-red-800/50 font-bold py-3 rounded-xl flex justify-center items-center"><Trash2 size={18} className="mr-2" /> Excluir Registro</button>
-    </div>
-  </ModalWrapper>
+
+  const handleSaveEdit = (e) => {
+    e.preventDefault();
+    setEntries(prev => prev.map(item => {
+      if (item.id === entry.id) {
+        const updated = { ...editData };
+        if (updated.type === 'abastecimento') {
+          updated.litros = parseFloat(updated.litros) || 0;
+          updated.valorTotal = parseFloat(updated.valorTotal) || 0;
+          updated.odometro = parseFloat(updated.odometro) || 0;
+          updated.precoLitro = updated.litros > 0 ? parseFloat((updated.valorTotal / updated.litros).toFixed(2)) : 0;
+        } else if (updated.type === 'despesa') {
+          updated.valor = parseFloat(updated.valor) || 0;
+        } else if (updated.type === 'viagem') {
+          updated.kmRodados = parseFloat(updated.kmRodados) || 0;
+          updated.litrosGastos = parseFloat(updated.litrosGastos) || 0;
+        }
+        return updated;
+      }
+      return item;
+    }));
+    onClose();
+  };
+
+  if (isEditing) {
+    return (
+      <ModalWrapper title="Editar Registro" color="slate" icon={<Info size={24}/>} onClose={onClose}>
+        <form onSubmit={handleSaveEdit} className="space-y-4">
+          <Input label="Data" type="date" value={editData.date ? editData.date.split('T')[0] : ''} onChange={e => setEditData({...editData, date: new Date(e.target.value + 'T12:00:00Z').toISOString()})} />
+          
+          {entry.type === 'abastecimento' && (
+            <>
+              <Input label="Odômetro (km)" type="number" value={editData.odometro || ''} onChange={e => setEditData({...editData, odometro: e.target.value})} />
+              <div className="grid grid-cols-2 gap-3">
+                <Input label="Litros" type="number" step="0.01" value={editData.litros || ''} onChange={e => setEditData({...editData, litros: e.target.value})} />
+                <Input label="Valor Total (R$)" type="number" step="0.01" value={editData.valorTotal || ''} onChange={e => setEditData({...editData, valorTotal: e.target.value})} />
+              </div>
+            </>
+          )}
+
+          {entry.type === 'despesa' && (
+            <>
+              <Input label="Título da Despesa" type="text" value={editData.titulo || ''} onChange={e => setEditData({...editData, titulo: e.target.value})} />
+              <Input label="Valor Total (R$)" type="number" step="0.01" value={editData.valor || ''} onChange={e => setEditData({...editData, valor: e.target.value})} />
+            </>
+          )}
+
+          {entry.type === 'viagem' && (
+            <>
+              <Input label="Título da Viagem" type="text" value={editData.titulo || ''} onChange={e => setEditData({...editData, titulo: e.target.value})} />
+              <div className="grid grid-cols-2 gap-3">
+                <Input label="Km Rodados" type="number" step="0.1" value={editData.kmRodados || ''} onChange={e => setEditData({...editData, kmRodados: e.target.value})} />
+                <Input label="Litros Gastos" type="number" step="0.1" value={editData.litrosGastos || ''} onChange={e => setEditData({...editData, litrosGastos: e.target.value})} />
+              </div>
+            </>
+          )}
+
+          <div>
+            <label className="text-xs text-slate-400 ml-1">Observação / Descrição</label>
+            <input type="text" value={editData.descricao || ''} onChange={e => setEditData({...editData, descricao: e.target.value})} className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl p-3 text-white focus:border-cyan-500 focus:outline-none" />
+          </div>
+
+          <div className="flex space-x-2 pt-4">
+            <button type="button" onClick={() => setIsEditing(false)} className="flex-1 bg-slate-800 text-slate-300 font-bold py-3 rounded-xl">Cancelar</button>
+            <button type="submit" className="flex-1 bg-cyan-600 text-white font-bold py-3 rounded-xl">Salvar Alterações</button>
+          </div>
+        </form>
+      </ModalWrapper>
+    );
+  }
+
+  return (
+    <ModalWrapper title={entry.type === 'abastecimento' ? 'Abastecimento' : entry.titulo} color="slate" icon={<Info size={24}/>} onClose={onClose}>
+      <div className="space-y-4">
+        <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 text-sm space-y-2 text-slate-300">
+          <p><span className="text-slate-200 font-medium">Data:</span> {new Date(entry.date).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}</p>
+          <p><span className="text-slate-200 font-medium">Tipo:</span> <span className="capitalize">{entry.type === 'despesa' ? 'Manutenção' : entry.type}</span></p>
+          
+          {entry.type === 'abastecimento' && (
+            <>
+              <p><span className="text-slate-200 font-medium">Odômetro:</span> {entry.odometro} km</p>
+              <p><span className="text-slate-200 font-medium">Litros:</span> {entry.litros} L</p>
+              <p><span className="text-slate-200 font-medium">Preço por Litro:</span> R$ {entry.precoLitro?.toFixed(2)}</p>
+              <p><span className="text-slate-200 font-medium">Valor Total:</span> <span className="text-emerald-400 font-bold">R$ {entry.valorTotal?.toFixed(2)}</span></p>
+            </>
+          )}
+
+          {entry.type === 'despesa' && (
+            <>
+              <p><span className="text-slate-200 font-medium">Valor Total:</span> <span className="text-red-400 font-bold">R$ {entry.valor?.toFixed(2)}</span></p>
+            </>
+          )}
+
+          {entry.type === 'viagem' && (
+            <>
+              <p><span className="text-slate-200 font-medium">Km Rodados:</span> {entry.kmRodados} km</p>
+              <p><span className="text-slate-200 font-medium">Litros Gastos:</span> {entry.litrosGastos?.toFixed(1)} L</p>
+              {entry.duracao && <p><span className="text-slate-200 font-medium">Duração:</span> {entry.duracao}</p>}
+            </>
+          )}
+
+          {entry.descricao && <p><span className="text-slate-200 font-medium">Observação:</span> {entry.descricao}</p>}
+        </div>
+
+        <div className="flex space-x-3 pt-2">
+          <button onClick={() => setIsEditing(true)} className="flex-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-cyan-400 font-bold py-3.5 rounded-xl flex justify-center items-center">
+            Editar
+          </button>
+          <button onClick={handleDelete} className="flex-1 bg-red-900/30 hover:bg-red-900/50 text-red-400 border border-red-800/50 font-bold py-3.5 rounded-xl flex justify-center items-center">
+            Excluir
+          </button>
+        </div>
+      </div>
+    </ModalWrapper>
+  );
 }
+
 
 function ModalWrapper({ title, color, icon, onClose, children }) {
   const colorMap = { emerald: 'from-emerald-600 to-cyan-500', red: 'from-red-600 to-orange-500', purple: 'from-purple-600 to-indigo-500', indigo: 'from-indigo-600 to-purple-500', slate: 'from-slate-600 to-slate-400' };
