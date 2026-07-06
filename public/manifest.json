@@ -1,0 +1,28 @@
+{
+  "short_name": "MotoLog",
+  "name": "MotoLog",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#0a1325",
+  "theme_color": "#0a1325",
+  "display": "standalone",
+  "orientation": "portrait",
+  "splash_screens": [
+    {
+      "src": "splash.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ]
+}
