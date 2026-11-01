@@ -1,13 +1,17 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import 'leaflet/dist/leaflet.css';
+import { CircleMarker, MapContainer, Polyline, TileLayer, useMap } from 'react-leaflet';
 import { 
   LayoutDashboard, List, BarChart2, Settings, Plus, X, Fuel, Wrench, 
   Gauge, Droplets, Calendar, MapPin, Trash2, Info, Map, Square, Navigation, 
   Search, Loader2, CheckCircle2, Database, Download, Upload, Filter,
-  TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, Activity, DollarSign
+  TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, Activity, DollarSign,
+  Sun, Moon, Volume2, VolumeX
 } from 'lucide-react';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('PAINEL');
+  const [isLightTheme, setIsLightTheme] = useState(() => localStorage.getItem('motolog_theme') === 'light');
   const [fabMenuOpen, setFabMenuOpen] = useState(false);
   const [activeModal, setActiveModal] = useState(null);
   const [selectedEntry, setSelectedEntry] = useState(null);
@@ -45,6 +49,7 @@ export default function App() {
   useEffect(() => { localStorage.setItem('motolog_fuel', JSON.stringify(currentFuel)); }, [currentFuel]);
   useEffect(() => { localStorage.setItem('motolog_entries', JSON.stringify(entries)); }, [entries]);
   useEffect(() => { localStorage.setItem('motolog_active_trip', JSON.stringify(activeTrip)); }, [activeTrip]);
+  useEffect(() => { localStorage.setItem('motolog_theme', isLightTheme ? 'light' : 'dark'); }, [isLightTheme]);
 
   useEffect(() => { setFabMenuOpen(false); }, [activeTab]);
 
@@ -70,7 +75,7 @@ export default function App() {
   };
 
   return (
-    <div className="h-[100dvh] w-full bg-[#060b14] flex justify-center font-sans text-slate-200 overflow-hidden">
+    <div className={`h-[100dvh] w-full bg-[#060b14] flex justify-center font-sans text-slate-200 overflow-hidden ${isLightTheme ? 'theme-light' : ''}`}>
       <div className="h-full w-full max-w-md bg-gradient-to-b from-[#0a1325] to-[#040811] relative flex flex-col shadow-2xl md:border-x md:border-slate-800 overflow-hidden">
         
         <header className="pt-8 pb-4 px-6 bg-transparent flex justify-between items-center z-10 flex-shrink-0">
@@ -79,9 +84,20 @@ export default function App() {
               MOTO<span className="text-slate-100">LOG</span>
             </h1>
           </div>
-          <div className="flex items-center space-x-2 text-cyan-400 bg-cyan-900/20 px-3 py-1 rounded-full border border-cyan-500/30">
-            <Gauge size={16} />
-            <span className="text-sm font-bold font-mono tracking-wide">{config.odometro} <span className="text-[10px] text-cyan-600">KM</span></span>
+          <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2 text-cyan-400 bg-cyan-900/20 px-3 py-1 rounded-full border border-cyan-500/30">
+              <Gauge size={16} />
+              <span className="text-sm font-bold font-mono tracking-wide">{config.odometro} <span className="text-[10px] text-cyan-600">KM</span></span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsLightTheme(theme => !theme)}
+              className="rounded-full border border-slate-700 p-2 text-slate-300 transition-colors hover:bg-slate-800"
+              aria-label={isLightTheme ? 'Ativar tema escuro' : 'Ativar tema claro'}
+              title={isLightTheme ? 'Ativar tema escuro' : 'Ativar tema claro'}
+            >
+              {isLightTheme ? <Moon size={18} /> : <Sun size={18} />}
+            </button>
           </div>
         </header>
 
@@ -510,25 +526,127 @@ function calcHaversine(lat1, lon1, lat2, lon2) {
   return R * c;
 }
 
+function formatManeuver(step) {
+  const { type, modifier, exit } = step.maneuver;
+  const street = step.name ? ` para ${step.name}` : '';
+  const directions = {
+    left: 'à esquerda',
+    right: 'à direita',
+    'slight left': 'levemente à esquerda',
+    'slight right': 'levemente à direita',
+    'sharp left': 'acentuadamente à esquerda',
+    'sharp right': 'acentuadamente à direita',
+    straight: 'em frente',
+    uturn: 'faça o retorno',
+  };
+  const direction = directions[modifier] || '';
+
+  if (type === 'arrive') return 'Você chegou ao destino.';
+  if (type === 'roundabout' || type === 'rotary') {
+    return `Na rotatória, pegue a saída ${exit || ''}${street}.`.replace('  ', ' ');
+  }
+  if (type === 'depart') return `Siga${street}.`;
+  if (type === 'merge' || type === 'on ramp' || type === 'off ramp') {
+    return `${type === 'merge' ? 'Entre' : 'Acesse'} ${direction}${street}.`.replace('  ', ' ');
+  }
+  if (type === 'fork' || type === 'end of road' || type === 'turn') {
+    return `Vire ${direction || 'na via'}${street}.`;
+  }
+  return `Continue${street}.`;
+}
+
+function FitRouteBounds({ route }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (route?.coordinates?.length) {
+      map.fitBounds(route.coordinates, { padding: [24, 24] });
+    }
+  }, [map, route]);
+
+  return null;
+}
+
+function FollowCurrentPosition({ position }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (position) map.panTo(position);
+  }, [map, position]);
+
+  return null;
+}
+
+function RouteMap({ route, currentPosition, height = 'h-64', follow = false }) {
+  const center = currentPosition || route.coordinates[0];
+
+  return (
+    <div className={`${height} w-full overflow-hidden rounded-2xl border border-slate-700`}>
+      <MapContainer center={center} zoom={14} scrollWheelZoom className="h-full w-full">
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
+        <FitRouteBounds route={route} />
+        {follow && currentPosition && <FollowCurrentPosition position={currentPosition} />}
+        <Polyline positions={route.coordinates} pathOptions={{ color: '#0891b2', weight: 6, opacity: 0.9 }} />
+        <CircleMarker center={route.origin} radius={7} pathOptions={{ color: '#fff', fillColor: '#16a34a', fillOpacity: 1 }} />
+        <CircleMarker center={route.destination} radius={7} pathOptions={{ color: '#fff', fillColor: '#dc2626', fillOpacity: 1 }} />
+        {currentPosition && (
+          <CircleMarker center={currentPosition} radius={8} pathOptions={{ color: '#fff', fillColor: '#2563eb', fillOpacity: 1, weight: 3 }} />
+        )}
+      </MapContainer>
+    </div>
+  );
+}
+
 function TabViagem({ config, entries, activeTrip, setActiveTrip, onStopTrip, currentFuel }) {
   const ultimoAbast = entries.find(e => e.type === 'abastecimento');
   const [precoPlan, setPrecoPlan] = useState(ultimoAbast ? ultimoAbast.precoLitro : 5.89);
   const [destinoQuery, setDestinoQuery] = useState('');
-  const [distanciaPlan, setDistanciaPlan] = useState(0);
+  const [routePlan, setRoutePlan] = useState(null);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState('');
   const [searchSuccess, setSearchSuccess] = useState('');
+  const [voiceEnabled, setVoiceEnabled] = useState(Boolean(activeTrip?.voiceEnabled));
+  const [gpsError, setGpsError] = useState('');
+  const lastAnnouncedStepRef = useRef(-1);
 
   const [elapsed, setElapsed] = useState(activeTrip ? activeTrip.elapsedTime || 0 : 0);
   const [gpsKm, setGpsKm] = useState(activeTrip ? activeTrip.accumulatedKm || 0 : 0);
   const [currentSpeed, setCurrentSpeed] = useState(0); 
   const lastUpdateRef = useRef(Date.now());
 
+  const speak = (message) => {
+    if (!('speechSynthesis' in window)) {
+      setSearchError('Este navegador não oferece comandos de voz.');
+      return;
+    }
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(message);
+    utterance.lang = 'pt-BR';
+    utterance.rate = 1;
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const handleToggleVoice = () => {
+    if (!('speechSynthesis' in window)) {
+      setSearchError('Este navegador não oferece comandos de voz.');
+      return;
+    }
+
+    const enabled = !voiceEnabled;
+    setVoiceEnabled(enabled);
+    setActiveTrip(prev => prev ? { ...prev, voiceEnabled: enabled } : prev);
+    if (enabled) speak('Orientação por voz ativada.');
+    else window.speechSynthesis.cancel();
+  };
+
   useEffect(() => {
     let interval, watchId;
     if (activeTrip && !activeTrip.isPaused) {
       interval = setInterval(() => { setElapsed(prev => prev + 1); }, 1000);
-      if ('geolocation' in navigator) {
+      if (navigator.geolocation && typeof navigator.geolocation.watchPosition === 'function') {
         watchId = navigator.geolocation.watchPosition(
           (position) => {
             if (position.coords.accuracy && position.coords.accuracy > 30) return;
@@ -537,11 +655,27 @@ function TabViagem({ config, entries, activeTrip, setActiveTrip, onStopTrip, cur
             const timeDiffInSeconds = (now - lastUpdateRef.current) / 1000;
             if (timeDiffInSeconds < 2) return;
 
+            const navigationRoute = activeTrip.navigationRoute;
+            let nextStepIndex = activeTrip.nextStepIndex || 0;
+            const nextStep = navigationRoute?.steps[nextStepIndex];
+            if (nextStep) {
+              const distanceToStep = calcHaversine(latitude, longitude, nextStep.location[0], nextStep.location[1]) * 1000;
+              if (distanceToStep <= 45) {
+                if (activeTrip.voiceEnabled) speak(nextStep.instruction);
+                nextStepIndex += 1;
+                lastAnnouncedStepRef.current = -1;
+              } else if (activeTrip.voiceEnabled && distanceToStep <= 500 && lastAnnouncedStepRef.current !== nextStepIndex) {
+                const distanceText = distanceToStep >= 100 ? `${Math.round(distanceToStep / 50) * 50} metros` : 'menos de 100 metros';
+                speak(`Em ${distanceText}, ${nextStep.instruction}`);
+                lastAnnouncedStepRef.current = nextStepIndex;
+              }
+            }
+
             setActiveTrip(prev => {
               if (!prev || prev.isPaused) return prev;
               let newKm = 0; let calculatedSpeed = 0;
               
-              if (prev.lastLat && prev.lastLon) {
+              if (prev.lastLat != null && prev.lastLon != null) {
                 newKm = calcHaversine(prev.lastLat, prev.lastLon, latitude, longitude);
                 const timeDiffInHours = (now - lastUpdateRef.current) / 3600000;
                 if (timeDiffInHours > 0) calculatedSpeed = newKm / timeDiffInHours;
@@ -556,46 +690,86 @@ function TabViagem({ config, entries, activeTrip, setActiveTrip, onStopTrip, cur
 
                 setCurrentSpeed(finalSpeed);
                 lastUpdateRef.current = now;
-                return { ...prev, lastLat: latitude, lastLon: longitude, accumulatedKm: updatedKm, speed: finalSpeed };
+                return { ...prev, lastLat: latitude, lastLon: longitude, currentLat: latitude, currentLon: longitude, accumulatedKm: updatedKm, speed: finalSpeed, nextStepIndex };
               } else {
                 setCurrentSpeed(prevSpeed => {
                   const nextSpeed = prevSpeed * 0.4;
                   return nextSpeed < 2 ? 0 : nextSpeed;
                 });
-                return prev;
+                return { ...prev, currentLat: latitude, currentLon: longitude, nextStepIndex };
               }
             });
           },
-          (error) => console.log("GPS aguardando..."),
+          (error) => setGpsError(error.code === 1 ? 'Permita o acesso à localização para acompanhar a rota.' : 'Não foi possível obter o GPS. Verifique a conexão e o sinal.'),
           { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
         );
       }
     }
-    return () => { clearInterval(interval); if (watchId) navigator.geolocation.clearWatch(watchId); };
+    return () => {
+      clearInterval(interval);
+      if (watchId !== undefined && navigator.geolocation && typeof navigator.geolocation.clearWatch === 'function') {
+        navigator.geolocation.clearWatch(watchId);
+      }
+    };
   }, [activeTrip, setActiveTrip]);
 
-  const handleStartTrip = () => {
-    setActiveTrip({ startTime: Date.now(), elapsedTime: 0, startOdo: config.odometro, accumulatedKm: 0, lastLat: null, lastLon: null, isPaused: false });
+  const handleStartTrip = (navigationRoute = null) => {
+    setActiveTrip({ startTime: Date.now(), elapsedTime: 0, startOdo: config.odometro, accumulatedKm: 0, lastLat: null, lastLon: null, isPaused: false, navigationRoute, nextStepIndex: 0, voiceEnabled });
     setGpsKm(0); setElapsed(0); setCurrentSpeed(0); lastUpdateRef.current = Date.now();
+    lastAnnouncedStepRef.current = -1;
+    setGpsError(navigator.geolocation && typeof navigator.geolocation.watchPosition === 'function'
+      ? ''
+      : 'Este navegador não oferece acompanhamento por GPS.');
+    if (voiceEnabled) speak(navigationRoute ? `Navegação iniciada. ${navigationRoute.steps[0]?.instruction || 'Siga pela rota.'}` : 'Viagem iniciada.');
   };
 
   const handleTogglePause = () => {
     setActiveTrip(prev => ({ ...prev, isPaused: !prev.isPaused, elapsedTime: elapsed, lastLat: null, lastLon: null }));
   };
 
-  const handleCalcularRota = async () => {
-    if (!destinoQuery) return;
-    setIsSearching(true); setSearchError(''); setSearchSuccess(''); setDistanciaPlan(0);
+  const handleCalcularRota = async (event) => {
+    event.preventDefault();
+    if (!destinoQuery.trim()) return;
+    setIsSearching(true); setSearchError(''); setSearchSuccess(''); setRoutePlan(null);
     try {
-      const pos = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true }));
-      const geoRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(destinoQuery)}`);
+      if (!navigator.geolocation || typeof navigator.geolocation.getCurrentPosition !== 'function') {
+        throw new Error('Este navegador não oferece acesso ao GPS.');
+      }
+      const pos = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }));
+      const geoRes = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(destinoQuery.trim())}`);
+      if (!geoRes.ok) throw new Error('Não foi possível pesquisar o endereço.');
       const geoData = await geoRes.json();
-      if (geoData.length === 0) throw new Error('Destino não encontrado.');
-      const routeRes = await fetch(`https://router.project-osrm.org/route/v1/driving/${pos.coords.longitude},${pos.coords.latitude};${geoData[0].lon},${geoData[0].lat}?overview=false`);
+      if (geoData.length === 0) throw new Error('Endereço não encontrado. Confira o endereço e tente novamente.');
+      const origin = [pos.coords.latitude, pos.coords.longitude];
+      const destination = [Number(geoData[0].lat), Number(geoData[0].lon)];
+      const routeRes = await fetch(`https://router.project-osrm.org/route/v1/driving/${origin[1]},${origin[0]};${destination[1]},${destination[0]}?overview=full&geometries=geojson&steps=true`);
+      if (!routeRes.ok) throw new Error('Não foi possível calcular a rota agora.');
       const routeData = await routeRes.json();
-      setDistanciaPlan((routeData.routes[0].distance / 1000).toFixed(1));
+      if (routeData.code !== 'Ok' || !routeData.routes?.[0]) throw new Error('Não foi encontrada uma rota para esse endereço.');
+      const route = routeData.routes[0];
+      const steps = route.legs.flatMap(leg => leg.steps)
+        .filter(step => step.maneuver.type !== 'depart')
+        .map(step => ({
+          instruction: formatManeuver(step),
+          distance: step.distance,
+          location: [step.maneuver.location[1], step.maneuver.location[0]],
+        }));
+      setRoutePlan({
+        id: Date.now(),
+        origin,
+        destination,
+        destinationName: geoData[0].display_name,
+        coordinates: route.geometry.coordinates.map(([longitude, latitude]) => [latitude, longitude]),
+        distance: route.distance,
+        duration: route.duration,
+        steps,
+      });
       setSearchSuccess(`Rota traçada!`);
-    } catch (err) { setSearchError('Erro ao buscar rota. Ative o GPS.'); }
+    } catch (err) {
+      setSearchError(typeof err?.code === 'number' && [1, 2, 3].includes(err.code)
+        ? 'Não foi possível acessar o GPS. Permita a localização e tente novamente.'
+        : err.message || 'Erro ao buscar a rota.');
+    }
     setIsSearching(false);
   };
 
@@ -604,12 +778,32 @@ function TabViagem({ config, entries, activeTrip, setActiveTrip, onStopTrip, cur
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}`;
   };
 
-  const calcLitros = config.kmL > 0 ? (parseFloat(distanciaPlan) || 0) / config.kmL : 0;
+  const distanciaPlan = routePlan ? routePlan.distance / 1000 : 0;
+  const calcLitros = config.kmL > 0 ? distanciaPlan / config.kmL : 0;
   const calcCusto = calcLitros * (parseFloat(precoPlan) || 0);
 
   if (activeTrip) {
+    const currentPosition = activeTrip.currentLat != null && activeTrip.currentLon != null
+      ? [activeTrip.currentLat, activeTrip.currentLon]
+      : activeTrip.navigationRoute?.origin;
+    const nextInstruction = activeTrip.navigationRoute?.steps[activeTrip.nextStepIndex || 0];
+
     return (
-      <div className="flex flex-col items-center justify-center h-full pt-4 space-y-6 animate-fade-in-up">
+      <div className="flex flex-col items-center pt-4 space-y-4 animate-fade-in-up">
+        {activeTrip.navigationRoute && (
+          <>
+            <RouteMap route={activeTrip.navigationRoute} currentPosition={currentPosition} follow height="h-56" />
+            <div className="w-full rounded-2xl border border-cyan-700/40 bg-cyan-950/30 p-4">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-cyan-400">Próxima instrução</p>
+              <p className="mt-1 text-sm font-bold text-slate-100">{nextInstruction?.instruction || 'Você chegou ao destino.'}</p>
+              <p className="mt-1 text-xs text-slate-400">{activeTrip.navigationRoute.destinationName}</p>
+            </div>
+            <button type="button" onClick={handleToggleVoice} className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-800 py-3 text-sm font-bold text-slate-200">
+              {voiceEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
+              {voiceEnabled ? 'Desativar orientação por voz' : 'Ativar orientação por voz'}
+            </button>
+          </>
+        )}
         <div className={`border rounded-3xl p-6 w-full flex flex-col items-center shadow-[0_0_30px_rgba(0,0,0,0.3)] relative overflow-hidden ${activeTrip.isPaused ? 'bg-amber-900/20 border-amber-500/30' : 'bg-indigo-900/30 border-indigo-500/50'}`}>
           <span className={`text-xs font-bold mb-2 flex items-center z-10 ${activeTrip.isPaused ? 'text-amber-500' : 'text-cyan-500'}`}>
              {activeTrip.isPaused ? <><div className="w-2 h-2 bg-amber-500 rounded-full mr-2"></div> VIAGEM PAUSADA</> : <><div className="w-2 h-2 bg-red-500 rounded-full animate-pulse mr-2"></div> AO VIVO</>}
@@ -621,6 +815,7 @@ function TabViagem({ config, entries, activeTrip, setActiveTrip, onStopTrip, cur
              <div className="text-center"><p className="text-xl font-bold text-purple-400">{gpsKm.toFixed(1)} km</p><p className="text-[9px] text-slate-400">DISTÂNCIA</p></div>
           </div>
         </div>
+        {gpsError && <p role="status" className="w-full text-center text-xs text-amber-400">{gpsError}</p>}
         <div className="w-full flex space-x-3">
           <button onClick={handleTogglePause} className={`flex-1 font-black py-5 rounded-2xl transition-all ${activeTrip.isPaused ? 'bg-emerald-600 text-white' : 'bg-amber-600 text-white'}`}>
             {activeTrip.isPaused ? 'RETOMAR' : 'PAUSAR'}
@@ -637,17 +832,43 @@ function TabViagem({ config, entries, activeTrip, setActiveTrip, onStopTrip, cur
       <button onClick={handleStartTrip} className="w-full bg-indigo-600 text-white font-bold py-4 rounded-2xl shadow-lg">Iniciar Rota Agora</button>
       
       <div className="bg-[#0f172a]/80 backdrop-blur-md border border-slate-800 rounded-3xl p-5">
-        <h3 className="text-sm font-bold text-slate-300 mb-4">Calculadora de Rota</h3>
-        <div className="space-y-4">
-           <div className="flex space-x-2"><input type="text" value={destinoQuery} onChange={(e) => setDestinoQuery(e.target.value)} placeholder="Destino..." className="flex-1 bg-slate-900 p-3 rounded-xl text-white text-sm border border-slate-700" /><button onClick={handleCalcularRota} className="bg-cyan-600 p-3 rounded-xl text-white">{isSearching ? <Loader2 className="animate-spin"/> : <Search />}</button></div>
+        <h3 className="text-sm font-bold text-slate-300 mb-4">Planejar rota</h3>
+        <form onSubmit={handleCalcularRota} className="space-y-4">
+           <div className="flex space-x-2"><input type="text" value={destinoQuery} onChange={(e) => setDestinoQuery(e.target.value)} placeholder="Digite o endereço de destino" aria-label="Endereço de destino" required className="flex-1 bg-slate-900 p-3 rounded-xl text-white text-sm border border-slate-700" /><button type="submit" disabled={isSearching} aria-label="Buscar rota" className="bg-cyan-600 p-3 rounded-xl text-white disabled:opacity-60">{isSearching ? <Loader2 className="animate-spin"/> : <Search />}</button></div>
            
            <div className="grid grid-cols-2 gap-3">
-              <input type="number" readOnly value={distanciaPlan || ''} placeholder="Distância (km)" className="bg-slate-900/50 border border-slate-800 rounded-xl p-3 text-slate-400" />
+              <input type="text" readOnly value={routePlan ? `${distanciaPlan.toFixed(1)} km` : ''} placeholder="Distância da rota" aria-label="Distância da rota" className="bg-slate-900/50 border border-slate-800 rounded-xl p-3 text-slate-400" />
               <input type="number" value={precoPlan} onChange={(e) => setPrecoPlan(e.target.value)} placeholder="Preço (R$)" className="bg-slate-900 border border-slate-700 rounded-xl p-3 text-white" />
            </div>
 
-           {distanciaPlan > 0 && (
+           {searchError && <p role="alert" className="text-xs text-red-400">{searchError}</p>}
+           {searchSuccess && <p role="status" className="text-xs text-emerald-400">{searchSuccess}</p>}
+           {routePlan && (
             <div className="space-y-3 mt-4">
+                <RouteMap route={routePlan} />
+                <div className="flex items-center justify-between gap-2 text-xs text-slate-400">
+                  <span>{routePlan.destinationName}</span>
+                  <span className="shrink-0">{Math.round(routePlan.duration / 60)} min</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleToggleVoice}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-800 py-3 text-sm font-bold text-slate-200"
+                >
+                  {voiceEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
+                  {voiceEnabled ? 'Orientação por voz ativada' : 'Ativar orientação por voz'}
+                </button>
+                <button type="button" onClick={() => handleStartTrip(routePlan)} className="w-full rounded-xl bg-indigo-600 py-3 font-bold text-white">
+                  Iniciar navegação
+                </button>
+                <div className="max-h-44 space-y-2 overflow-y-auto rounded-xl border border-slate-800 p-3">
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Instruções da rota</p>
+                  {routePlan.steps.map((step, index) => (
+                    <p key={`${index}-${step.location.join(',')}`} className="border-t border-slate-800 pt-2 text-xs text-slate-300">
+                      {step.instruction} {step.distance >= 1000 ? `(${(step.distance / 1000).toFixed(1)} km)` : `(${Math.round(step.distance)} m)`}
+                    </p>
+                  ))}
+                </div>
                 <div className="grid grid-cols-2 gap-3">
                     <div className="bg-slate-900 p-3 rounded-xl border border-slate-700 text-center">
                         <p className="text-[10px] text-slate-400 uppercase">Litros Necessários</p>
@@ -666,8 +887,9 @@ function TabViagem({ config, entries, activeTrip, setActiveTrip, onStopTrip, cur
                 </div>
             </div>
            )}
-        </div>
+        </form>
       </div>
+      <p className="px-2 text-[10px] text-slate-500">Mapas © OpenStreetMap. Rotas para carro: confirme as condições e sinalização locais; mantenha o foco na direção.</p>
     </div>
   );
 }
