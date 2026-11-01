@@ -580,6 +580,17 @@ function FollowCurrentPosition({ position }) {
   return null;
 }
 
+function speakPortuguese(message) {
+  if (!('speechSynthesis' in window)) return false;
+
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(message);
+  utterance.lang = 'pt-BR';
+  utterance.rate = 1;
+  window.speechSynthesis.speak(utterance);
+  return true;
+}
+
 function RouteMap({ route, currentPosition, height = 'h-64', follow = false }) {
   const center = currentPosition || route.coordinates[0];
 
@@ -618,18 +629,14 @@ function TabViagem({ config, entries, activeTrip, setActiveTrip, onStopTrip, cur
   const [elapsed, setElapsed] = useState(activeTrip ? activeTrip.elapsedTime || 0 : 0);
   const [gpsKm, setGpsKm] = useState(activeTrip ? activeTrip.accumulatedKm || 0 : 0);
   const [currentSpeed, setCurrentSpeed] = useState(0); 
+  const activeTripRef = useRef(activeTrip);
   const lastUpdateRef = useRef(Date.now());
+  const isTrackingTrip = Boolean(activeTrip && !activeTrip.isPaused);
 
   const speak = (message) => {
-    if (!('speechSynthesis' in window)) {
+    if (!speakPortuguese(message)) {
       setSearchError('Este navegador não oferece comandos de voz.');
-      return;
     }
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(message);
-    utterance.lang = 'pt-BR';
-    utterance.rate = 1;
-    window.speechSynthesis.speak(utterance);
   };
 
   const handleToggleVoice = () => {
@@ -646,8 +653,12 @@ function TabViagem({ config, entries, activeTrip, setActiveTrip, onStopTrip, cur
   };
 
   useEffect(() => {
+    activeTripRef.current = activeTrip;
+  }, [activeTrip]);
+
+  useEffect(() => {
     let interval, watchId;
-    if (activeTrip && !activeTrip.isPaused) {
+    if (isTrackingTrip) {
       interval = setInterval(() => { setElapsed(prev => prev + 1); }, 1000);
       if (navigator.geolocation && typeof navigator.geolocation.watchPosition === 'function') {
         watchId = navigator.geolocation.watchPosition(
@@ -658,50 +669,54 @@ function TabViagem({ config, entries, activeTrip, setActiveTrip, onStopTrip, cur
             const timeDiffInSeconds = (now - lastUpdateRef.current) / 1000;
             if (timeDiffInSeconds < 2) return;
 
-            const navigationRoute = activeTrip.navigationRoute;
-            let nextStepIndex = activeTrip.nextStepIndex || 0;
+            const previousTrip = activeTripRef.current;
+            if (!previousTrip || previousTrip.isPaused) return;
+
+            const navigationRoute = previousTrip.navigationRoute;
+            let nextStepIndex = previousTrip.nextStepIndex || 0;
             const nextStep = navigationRoute?.steps[nextStepIndex];
             if (nextStep) {
               const distanceToStep = calcHaversine(latitude, longitude, nextStep.location[0], nextStep.location[1]) * 1000;
               if (distanceToStep <= 45) {
-                if (activeTrip.voiceEnabled) speak(nextStep.instruction);
+                if (previousTrip.voiceEnabled) speakPortuguese(nextStep.instruction);
                 nextStepIndex += 1;
                 lastAnnouncedStepRef.current = -1;
-              } else if (activeTrip.voiceEnabled && distanceToStep <= 500 && lastAnnouncedStepRef.current !== nextStepIndex) {
+              } else if (previousTrip.voiceEnabled && distanceToStep <= 500 && lastAnnouncedStepRef.current !== nextStepIndex) {
                 const distanceText = distanceToStep >= 100 ? `${Math.round(distanceToStep / 50) * 50} metros` : 'menos de 100 metros';
-                speak(`Em ${distanceText}, ${nextStep.instruction}`);
+                speakPortuguese(`Em ${distanceText}, ${nextStep.instruction}`);
                 lastAnnouncedStepRef.current = nextStepIndex;
               }
             }
 
-            setActiveTrip(prev => {
-              if (!prev || prev.isPaused) return prev;
-              let newKm = 0; let calculatedSpeed = 0;
-              
-              if (prev.lastLat != null && prev.lastLon != null) {
-                newKm = calcHaversine(prev.lastLat, prev.lastLon, latitude, longitude);
-                const timeDiffInHours = (now - lastUpdateRef.current) / 3600000;
-                if (timeDiffInHours > 0) calculatedSpeed = newKm / timeDiffInHours;
-              }
+            let newKm = 0;
+            let calculatedSpeed = 0;
+            if (previousTrip.lastLat != null && previousTrip.lastLon != null) {
+              newKm = calcHaversine(previousTrip.lastLat, previousTrip.lastLon, latitude, longitude);
+              const timeDiffInHours = (now - lastUpdateRef.current) / 3600000;
+              if (timeDiffInHours > 0) calculatedSpeed = newKm / timeDiffInHours;
+            }
 
-              if (newKm > 0.005) { 
-                const updatedKm = prev.accumulatedKm + newKm;
-                setGpsKm(updatedKm);
-                const oldSpeed = prev.speed || 0;
-                const smoothedSpeed = oldSpeed === 0 ? calculatedSpeed : (oldSpeed * 0.6) + (calculatedSpeed * 0.4);
-                const finalSpeed = smoothedSpeed > 160 ? oldSpeed : smoothedSpeed;
+            const traveled = newKm > 0.005;
+            const updatedKm = traveled ? previousTrip.accumulatedKm + newKm : previousTrip.accumulatedKm;
+            const oldSpeed = previousTrip.speed || 0;
+            const smoothedSpeed = oldSpeed === 0 ? calculatedSpeed : (oldSpeed * 0.6) + (calculatedSpeed * 0.4);
+            const finalSpeed = traveled ? (smoothedSpeed > 160 ? oldSpeed : smoothedSpeed) : (oldSpeed < 2 ? 0 : oldSpeed * 0.4);
+            const updatedTrip = {
+              ...previousTrip,
+              lastLat: traveled ? latitude : previousTrip.lastLat,
+              lastLon: traveled ? longitude : previousTrip.lastLon,
+              currentLat: latitude,
+              currentLon: longitude,
+              accumulatedKm: updatedKm,
+              speed: finalSpeed,
+              nextStepIndex,
+            };
 
-                setCurrentSpeed(finalSpeed);
-                lastUpdateRef.current = now;
-                return { ...prev, lastLat: latitude, lastLon: longitude, currentLat: latitude, currentLon: longitude, accumulatedKm: updatedKm, speed: finalSpeed, nextStepIndex };
-              } else {
-                setCurrentSpeed(prevSpeed => {
-                  const nextSpeed = prevSpeed * 0.4;
-                  return nextSpeed < 2 ? 0 : nextSpeed;
-                });
-                return { ...prev, currentLat: latitude, currentLon: longitude, nextStepIndex };
-              }
-            });
+            activeTripRef.current = updatedTrip;
+            setActiveTrip(updatedTrip);
+            setCurrentSpeed(finalSpeed);
+            if (traveled) setGpsKm(updatedKm);
+            if (traveled) lastUpdateRef.current = now;
           },
           (error) => setGpsError(error.code === 1 ? 'Permita o acesso à localização para acompanhar a rota.' : 'Não foi possível obter o GPS. Verifique a conexão e o sinal.'),
           { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
@@ -714,10 +729,12 @@ function TabViagem({ config, entries, activeTrip, setActiveTrip, onStopTrip, cur
         navigator.geolocation.clearWatch(watchId);
       }
     };
-  }, [activeTrip, setActiveTrip]);
+  }, [isTrackingTrip, setActiveTrip]);
 
   const handleStartTrip = (navigationRoute = null) => {
-    setActiveTrip({ startTime: Date.now(), elapsedTime: 0, startOdo: config.odometro, accumulatedKm: 0, lastLat: null, lastLon: null, isPaused: false, navigationRoute, nextStepIndex: 0, voiceEnabled });
+    const newTrip = { startTime: Date.now(), elapsedTime: 0, startOdo: config.odometro, accumulatedKm: 0, lastLat: null, lastLon: null, isPaused: false, navigationRoute, nextStepIndex: 0, voiceEnabled };
+    activeTripRef.current = newTrip;
+    setActiveTrip(newTrip);
     setGpsKm(0); setElapsed(0); setCurrentSpeed(0); lastUpdateRef.current = Date.now();
     lastAnnouncedStepRef.current = -1;
     setGpsError(navigator.geolocation && typeof navigator.geolocation.watchPosition === 'function'
@@ -727,7 +744,9 @@ function TabViagem({ config, entries, activeTrip, setActiveTrip, onStopTrip, cur
   };
 
   const handleTogglePause = () => {
-    setActiveTrip(prev => ({ ...prev, isPaused: !prev.isPaused, elapsedTime: elapsed, lastLat: null, lastLon: null }));
+    const pausedTrip = { ...activeTripRef.current, isPaused: !activeTripRef.current.isPaused, elapsedTime: elapsed, lastLat: null, lastLon: null };
+    activeTripRef.current = pausedTrip;
+    setActiveTrip(pausedTrip);
   };
 
   const handleCalcularRota = async (event) => {
