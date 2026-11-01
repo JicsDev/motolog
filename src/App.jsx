@@ -15,6 +15,7 @@ export default function App() {
   const [fabMenuOpen, setFabMenuOpen] = useState(false);
   const [activeModal, setActiveModal] = useState(null);
   const [selectedEntry, setSelectedEntry] = useState(null);
+  const mainRef = useRef(null);
 
   const [config, setConfig] = useState(() => {
     try {
@@ -44,6 +45,7 @@ export default function App() {
       return saved ? JSON.parse(saved) : null;
     } catch (e) { return null; }
   });
+  const isTripActive = activeTrip !== null;
 
   useEffect(() => { localStorage.setItem('motolog_config', JSON.stringify(config)); }, [config]);
   useEffect(() => { localStorage.setItem('motolog_fuel', JSON.stringify(currentFuel)); }, [currentFuel]);
@@ -52,6 +54,7 @@ export default function App() {
   useEffect(() => { localStorage.setItem('motolog_theme', isLightTheme ? 'light' : 'dark'); }, [isLightTheme]);
 
   useEffect(() => { setFabMenuOpen(false); }, [activeTab]);
+  useEffect(() => { mainRef.current?.scrollTo({ top: 0 }); }, [activeTab, isTripActive]);
 
   const handleCalculateConfig = (newConfig) => {
     const diffKm = newConfig.odometro - config.odometro;
@@ -101,7 +104,7 @@ export default function App() {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto pb-28 px-4 custom-scrollbar z-10 relative">
+        <main ref={mainRef} className="flex-1 overflow-y-auto pb-28 px-4 custom-scrollbar z-10 relative">
           {activeTab === 'PAINEL' && <TabPainel currentFuel={currentFuel} tanqueTotal={config.tanqueTotal} config={config} entries={entries} />}
           {activeTab === 'LOG' && <TabLog entries={entries} onSelectEntry={setSelectedEntry} />}
           {activeTab === 'VIAGEM' && <TabViagem config={config} entries={entries} activeTrip={activeTrip} setActiveTrip={setActiveTrip} onStopTrip={() => setActiveModal('encerrar_viagem')} currentFuel={currentFuel} />}
